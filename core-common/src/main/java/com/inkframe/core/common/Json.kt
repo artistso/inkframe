@@ -233,3 +233,4 @@ private class JsonParser(private val s: String) {
     private fun expect(c: Char) { if (peek() != c) fail("Expected '$c'"); i++ }
     private fun skipWs() { while (i < s.length && s[i].isWhitespace()) i++ }
     private fun fail(msg: String): Nothing = throw JsonParseException("$msg at index $i")
+}
