@@ -541,10 +541,6 @@ class StudioState : ViewModel() {
     }
 
     /** Records a finished vector stroke into the model for the active cel. */
-    fun recordStroke(data: com.inkframe.core.model.StrokeData) {
-        // ... (existing recordStroke logic)
-    }
-
     /** Finds the node closest to [pos] within [threshold] pixels. */
     fun findNodeAt(pos: Vec2, threshold: Float): Pair<Int, Int>? {
         val cel = activeLayer.cels[currentFrame] ?: return null
