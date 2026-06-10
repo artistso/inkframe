@@ -1449,56 +1449,6 @@ private fun FibonacciSquare(
     }
 }
 
-/** A comprehensive timeline showing playback controls plus all scene layers. */
-@Composable
-                            startX = dragStartX[0],
-                            endX = dragLastX[0],
-                            frameCount = frameCount,
-                            cellWidth = cellWpx,
-                            spacing = gapPx,
-                        ) { state.hasCelAt(it) }
-                        if (drag != null && drag.isMove) {
-                            state.moveCel(drag.from, drag.to)
-                            onMoved()
-                        }
-                        dragStartX[0] = -1f
-                    },
-                    onDrag = { change, _ -> dragLastX[0] = change.position.x },
-                )
-            },
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        val range = state.scene.playbackRange
-        for (f in 0 until frameCount) {
-            val active = f == state.currentFrame
-            val hasCel = state.activeLayer.cels.containsKey(f)
-            val inRange = f in range
-            val isEdge = f == range.first || f == range.last
-            Box(
-                Modifier
-                    .size(width = cellW, height = 28.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(
-                        when {
-                            active -> MaterialTheme.colorScheme.primary
-                            hasCel -> Color(0xFF4A4A52)
-                            else -> Color(0xFF333339)
-                        }.let { base -> if (inRange) base else base.copy(alpha = 0.4f) },
-                    )
-                    // Mark the loop in/out edges with a secondary accent underline bar.
-                    .then(
-                        if (isEdge) Modifier.border(
-                            width = 2.dp,
-                            color = MaterialTheme.colorScheme.secondary,
-                            shape = MaterialTheme.shapes.small,
-                        ) else Modifier,
-                    )
-                    .clickableNoRipple { onFrame(f) },
-            )
-        }
-    }
-}
-
 @Composable
 private fun TimelineAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
