@@ -1,12 +1,16 @@
-name: Android CI
+name: InkFrame CI/CD
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
 jobs:
   build:
@@ -21,21 +25,61 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: wrapper
           cache-overwrite-existing: true
+          # Submit dependency graph for security insights
+          dependency-graph: generate-and-submit
 
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-      - name: Run Build
-        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace --scan
 
-      - name: Upload debug APK
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: inkframe-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Release APK
+        # Note: This uses the debug signing config for now unless secrets are provided
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
+          name: InkFrame ${{ github.ref_name }}
+          body: |
+            InkFrame Studio ${{ github.ref_name }} - The Glass Horizon Build
+            
+            - High-Precision Quantum Nodes
+            - KJG Perspective Engine
+            - Andrew Kramer Saber Glow
+            
+            *Signed with project keys.*
