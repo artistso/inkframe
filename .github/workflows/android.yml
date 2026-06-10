@@ -1,16 +1,13 @@
-name: InkFrame Master Build
+name: InkFrame Build
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
-    name: Master Build Engine
+    name: Build APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,36 +20,12 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          gradle-version: wrapper
-          # DeepSeek Strategy: Force clean and overwrite cache
-          cache-overwrite-existing: true
-
-      - name: Grant execute permission
-        run: chmod +x gradlew
-
-      - name: Build Debug APK (High Precision)
-        # DeepSeek Strategy: Use --stacktrace and capture errors
-        run: |
-          ./gradlew assembleDebug --stacktrace --info > build.log 2>&1 || (tail -n 100 build.log && exit 1)
-
-      - name: Create Master Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: InkFrame Studio - Master Build
-          body: |
-            ## The Glass Horizon - Quantum Build
-            
-            Forged in partnership between **artistso** and **Arena AI**.
-            
-            ### Integrated AI Master Strategies:
-            - **DeepSeek Build Pipeline**: High-precision error logging and cache cleaning.
-            - **Andrew Kramer Saber**: Plasma-flicker ink and Lens Chromatic Aberration.
-            - **Kim Jung Gi Engine**: Curvilinear Perspective and Grid Snapping.
-            - **Proko Structural Nodes**: Kinetic segment sculpting.
-          files: app/build/outputs/apk/debug/*.apk
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: inkframe-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
