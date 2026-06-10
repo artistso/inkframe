@@ -42,8 +42,6 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":engine-gl"))
     implementation(project(":feature-canvas"))
-    implementation(project(":feature-timeline"))
-    implementation(project(":feature-layers"))
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")

@@ -497,13 +497,17 @@ class CanvasView(
                     Mode.DRAW -> {
                         for (h in 0 until event.historySize) {
                             val s = sample(0, h)
-                            if (currentStrokePoints.size < 1000) {
+                            // Precision Optimization: Only record if the point has moved significantly (0.5px)
+                            // This prevents "Node Pooling" when the artist dwells in one spot.
+                            val lastPos = currentStrokePoints.lastOrNull()?.pos
+                            if (currentStrokePoints.size < 800 && (lastPos == null || s.pos.distanceTo(lastPos) > 0.5f)) {
                                 currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
                             }
                             renderer.post(CanvasRenderer.EngineEvent.Extend(s))
                         }
                         val s = sample(0)
-                        if (currentStrokePoints.size < 1000) {
+                        val lastPos = currentStrokePoints.lastOrNull()?.pos
+                        if (currentStrokePoints.size < 800 && (lastPos == null || s.pos.distanceTo(lastPos) > 0.5f)) {
                             currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
                         }
                         renderer.post(CanvasRenderer.EngineEvent.Extend(s))
