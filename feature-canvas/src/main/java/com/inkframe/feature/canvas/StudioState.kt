@@ -539,7 +539,6 @@ class StudioState : ViewModel() {
         
         onUiInvalidate?.invoke()
     }
-
     /** Records a finished vector stroke into the model for the active cel. */
     /** Finds the node closest to [pos] within [threshold] pixels. */
     fun findNodeAt(pos: Vec2, threshold: Float): Pair<Int, Int>? {
