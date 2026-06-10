@@ -312,8 +312,11 @@ class PaintEngine(
         screenH: Int,
         showChecker: Boolean,
         invCoeffs: FloatArray,
-        sculptData: List<com.inkframe.core.model.StrokeData> = emptyList() // New: Render nodes
+        sculptData: List<com.inkframe.core.model.StrokeData> = emptyList(),
+        perspective: Boolean = false,
+        fisheye: Float = 0f
     ) {
+        // ... (existing preview logic)
         // ... (existing preview logic)
         // If a stroke is wet, build a preview (cel + scratch) and substitute it for the
         // cel being drawn so the artist sees the in-progress stroke without modifying
@@ -359,7 +362,7 @@ class PaintEngine(
             }
         }
 
-        compositor.present(flat, screenW, screenH, showChecker, invCoeffs)
+        compositor.present(flat, screenW, screenH, showChecker, invCoeffs, perspective, fisheye)
     }
 
     /**

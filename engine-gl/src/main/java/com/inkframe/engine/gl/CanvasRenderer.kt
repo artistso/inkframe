@@ -25,12 +25,15 @@ class CanvasRenderer(
     private val canvasHeight: Int,
     private val sceneProvider: () -> List<PaintEngine.LayerDrawSpec>,
     private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData> = { emptyList() },
+    private val perspectiveProvider: () -> PerspectiveConfig = { PerspectiveConfig() },
     private val onEngineReady: (PaintEngine) -> Unit,
     /** Survives GL-context loss; used to re-upload artwork when the context is recreated. */
     private val backupStore: SurfaceBackupStore,
     /** Invoked (on the GL thread) after surfaces are restored following context loss. */
     private val onContextRestored: () -> Unit = {},
 ) : GLSurfaceView.Renderer {
+
+    data class PerspectiveConfig(val enabled: Boolean = false, val fisheye: Float = 0f)
 
     private var engine: PaintEngine? = null
     private val events = ConcurrentLinkedQueue<EngineEvent>()
@@ -99,7 +102,8 @@ class CanvasRenderer(
         drainEvents(e)
         GLES30.glClearColor(0.5f, 0.5f, 0.5f, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        e.composeAndPresent(sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs(), sculptProvider())
+        val p = perspectiveProvider()
+        e.composeAndPresent(sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs(), sculptProvider(), p.enabled, p.fisheye)
     }
 
     private fun drainEvents(e: PaintEngine) {

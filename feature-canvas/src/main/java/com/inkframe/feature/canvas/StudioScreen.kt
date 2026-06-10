@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FormatColorFill
+import androidx.compose.material.icons.filled.Grid3x3
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Layers
@@ -381,6 +382,9 @@ fun StudioScreen(state: StudioState = viewModel()) {
                                     state.activeLayer.cels[state.currentFrame]?.vectorData?.strokes ?: emptyList()
                                 } else emptyList()
                             },
+                            perspectiveProvider = {
+                                CanvasRenderer.PerspectiveConfig(state.perspectiveEnabled, state.perspectiveFisheye)
+                            },
                             strokeConfig = {
                                 val sid = state.ensureActiveCel()
                                 CanvasView.StrokeConfig(
@@ -680,6 +684,14 @@ private fun TopToolbar(
             contentDescription = "Symmetry",
             active = state.symmetryEnabled,
             onClick = { state.symmetryEnabled = !state.symmetryEnabled }
+        )
+        Spacer(Modifier.width(4.dp))
+        
+        DonutIconButton(
+            icon = Icons.Filled.Grid3x3,
+            contentDescription = "Perspective Grid",
+            active = state.perspectiveEnabled,
+            onClick = { state.perspectiveEnabled = !state.perspectiveEnabled }
         )
     }
 }

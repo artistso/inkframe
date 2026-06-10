@@ -35,6 +35,7 @@ class CanvasView(
     canvasHeight: Int,
     private val sceneProvider: () -> List<PaintEngine.LayerDrawSpec>,
     private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData> = { emptyList() },
+    private val perspectiveProvider: () -> CanvasRenderer.PerspectiveConfig = { CanvasRenderer.PerspectiveConfig() },
     private val strokeConfig: () -> StrokeConfig,
     private val onEngineReady: (PaintEngine) -> Unit,
 ) : GLSurfaceView(context) {
@@ -67,6 +68,7 @@ class CanvasView(
             canvasHeight = canvasHeight,
             sceneProvider = sceneProvider,
             sculptProvider = sculptProvider,
+            perspectiveProvider = perspectiveProvider,
             onEngineReady = onEngineReady,
             backupStore = backupStore,
             onContextRestored = { post { onContextRestored?.invoke() } },

@@ -14,13 +14,17 @@ uniform vec2 uCanvasSize;   // canvas size in pixels
 uniform vec4 uInv;          // inverse affine: (iax, iay, ibx, iby)
 uniform int uShowChecker;
 
+// KJG & Proko Uniforms
+uniform int uPerspectiveEnabled;
+uniform float uFisheyeStrength; // 0.0 to 1.0
+
 out vec4 fragColor;
 
 vec3 checker(vec2 screenPx) {
     float s = 16.0;
     vec2 c = floor(screenPx / s);
     float m = mod(c.x + c.y, 2.0);
-    return mix(vec3(0.80), vec3(0.92), m);
+    return mix(vec3(0.08), vec3(0.12), m);
 }
 
 void main() {
@@ -32,7 +36,7 @@ void main() {
     cp.x = uInv.x * vp.x - uInv.y * vp.y + uInv.z;
     cp.y = uInv.y * vp.x + uInv.x * vp.y + uInv.w;
 
-    vec3 bg = (uShowChecker == 1) ? checker(vp) : vec3(0.30);
+    vec3 bg = (uShowChecker == 1) ? checker(vp) : vec3(0.05, 0.05, 0.06);
 
     // Canvas texture has v=0 at the bottom; canvas pixel y=0 is the top row.
     vec2 uv = vec2(cp.x / uCanvasSize.x, 1.0 - cp.y / uCanvasSize.y);
@@ -44,5 +48,19 @@ void main() {
 
     vec4 col = texture(uCanvas, uv);
     vec3 outRgb = mix(bg, col.rgb, col.a);
+    
+    // KJG Perspective Grid Overlay (Fish-eye)
+    if (uPerspectiveEnabled == 1) {
+        vec2 normC = uv * 2.0 - 1.0;
+        float d = length(normC);
+        vec2 gridC = normC * (1.0 + uFisheyeStrength * d * d);
+        
+        vec2 grid = abs(fract(gridC * 5.0 - 0.5) - 0.5) / fwidth(gridC * 5.0);
+        float line = min(grid.x, grid.y);
+        float gridAlpha = (1.0 - smoothstep(0.0, 1.2, line)) * 0.2;
+        
+        outRgb = mix(outRgb, vec3(0.0, 0.9, 1.0), gridAlpha);
+    }
+
     fragColor = vec4(outRgb, 1.0);
 }

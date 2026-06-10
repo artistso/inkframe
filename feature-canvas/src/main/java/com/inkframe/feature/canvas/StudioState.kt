@@ -81,6 +81,11 @@ class StudioState : ViewModel() {
         private set
     var showChecker by mutableStateOf(true)
 
+    // --- KJG & Proko Influences ---------------------------------------------
+    var perspectiveEnabled by mutableStateOf(false)
+    var perspectiveFisheye by mutableStateOf(0.5f) // 0 = Linear, 1 = KJG Fish-eye
+    var structureMode by mutableStateOf(false) // Proko "Lay-in" mode (lowers opacity, changes grit)
+
     // Mirror the engine's history availability for the toolbar buttons.
     var canUndo by mutableStateOf(false)
         private set
