@@ -11,122 +11,62 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/**
- * GLSurfaceView.Renderer that runs the paint engine on the GL thread.
- *
- * UI/input events are posted as [EngineEvent]s onto a lock-free queue and drained at
- * the start of each frame, guaranteeing all GL calls happen on the render thread.
- *
- * The renderer uses RENDERMODE_WHEN_DIRTY; [requestFrame] (via the host view) triggers
- * a redraw after input or document changes.
- */
 class CanvasRenderer(
     private val context: Context,
-    private val canvasWidth: Int,
-    private val canvasHeight: Int,
+    val canvasWidth: Int,
+    val canvasHeight: Int,
     private val sceneProvider: () -> List<PaintEngine.LayerDrawSpec>,
-    private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData> = { emptyList() },
-    private val perspectiveProvider: () -> PerspectiveConfig = { PerspectiveConfig() },
-    private val lassoProvider: () -> List<Vec2> = { emptyList() },
-    private val selectionProvider: () -> List<Pair<Int, Int>> = { emptyList() },
-    private val cursorProvider: () -> com.inkframe.core.common.Vec2? = { null },
+    private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData>,
+    private val perspectiveProvider: () -> PerspectiveConfig,
+    private val lassoProvider: () -> List<Vec2>,
+    private val selectionProvider: () -> List<Pair<Int, Int>>,
+    private val cursorProvider: () -> Vec2?,
     private val onEngineReady: (PaintEngine) -> Unit,
-    /** Survives GL-context loss; used to re-upload artwork when the context is recreated. */
-    private val backupStore: SurfaceBackupStore,
-    /** Invoked (on the GL thread) after surfaces are restored following context loss. */
-    private val onContextRestored: () -> Unit = {},
+    private val backupStore: SurfaceBackupStore
 ) : GLSurfaceView.Renderer {
-
-    data class PerspectiveConfig(val enabled: Boolean = false, val fisheye: Float = 0f)
 
     private var engine: PaintEngine? = null
     private val events = ConcurrentLinkedQueue<EngineEvent>()
-    @Volatile private var screenW = 1
-    @Volatile private var screenH = 1
-    @Volatile var showChecker = true
+    var showChecker = true
+    var viewport: ViewportTransform = ViewportTransform.IDENTITY
 
-    /** True once at least one GL context has been created (to detect *re*-creation). */
-    @Volatile private var hadContext = false
-
-    /** Current canvas→view transform; updated from the UI thread on pan/zoom/rotate. */
-    @Volatile var viewport: ViewportTransform = ViewportTransform.IDENTITY
+    data class PerspectiveConfig(val enabled: Boolean = false, val fisheye: Float = 0f)
 
     sealed interface EngineEvent {
-        data class Begin(
-            val surfaceId: Long,
-            val brush: Brush,
-            val color: RgbaColor,
-            val sample: InputSample,
-            val symmetryCount: Int = 0 // 0 = disabled, >0 = count
-        ) : EngineEvent
+        data class Begin(val surfaceId: Long, val brush: Brush, val color: RgbaColor, val sample: InputSample, val symmetryCount: Int) : EngineEvent
         data class Extend(val sample: InputSample) : EngineEvent
         data object End : EngineEvent
         data object Undo : EngineEvent
         data object Redo : EngineEvent
         data class Run(val block: (PaintEngine) -> Unit) : EngineEvent
-        data class Push(val command: com.inkframe.core.common.Command) : EngineEvent
     }
 
     fun post(event: EngineEvent) { events.add(event) }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        GLES30.glDisable(GLES30.GL_DEPTH_TEST)
-        // A new EGL context: every prior GL surface/texture is now invalid, so always
-        // build a fresh engine. The old one's GL handles are gone — nothing to release.
         val e = PaintEngine(context, canvasWidth, canvasHeight)
         engine = e
-
-        val isRecreation = hadContext && backupStore.size > 0
-        if (isRecreation) {
-            // Context was lost and recreated: re-upload artwork from the CPU-side backup
-            // instead of starting blank. The document/model state is untouched in the UI
-            // layer, so only GPU pixels need restoring.
-            e.restoreSurfaces(backupStore)
-            onContextRestored()
-        }
-        hadContext = true
-        // Always notify the host so it can (re)bind callbacks to the new engine instance.
         onEngineReady(e)
     }
 
-    /**
-     * Backs up all live GPU surfaces into the store. Posted via the event queue so it
-     * runs on the GL thread before the context is torn down (call from the View's pause).
-     */
-    fun backupSurfaces() {
-        post(EngineEvent.Run { e -> e.backupSurfaces(backupStore) })
-    }
-
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        screenW = width.coerceAtLeast(1)
-        screenH = height.coerceAtLeast(1)
+        GLES30.glViewport(0, 0, width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         val e = engine ?: return
-        drainEvents(e)
-        GLES30.glClearColor(0.5f, 0.5f, 0.5f, 1f)
-        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        val p = perspectiveProvider()
-        e.composeAndPresent(
-            sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs(), 
-            sculptProvider(), p.enabled, p.fisheye, lassoProvider(), selectionProvider(),
-            cursorProvider()
-        )
-    }
-
-    private fun drainEvents(e: PaintEngine) {
-        while (true) {
+        while (events.isNotEmpty()) {
             val ev = events.poll() ?: break
             when (ev) {
                 is EngineEvent.Begin -> e.beginStroke(ev.surfaceId, ev.brush, ev.color, ev.sample, ev.symmetryCount)
                 is EngineEvent.Extend -> e.extendStroke(ev.sample)
-                EngineEvent.End -> e.endStroke()
-                EngineEvent.Undo -> e.undo()
-                EngineEvent.Redo -> e.redo()
+                is EngineEvent.End -> e.endStroke()
+                is EngineEvent.Undo -> e.undo()
+                is EngineEvent.Redo -> e.redo()
                 is EngineEvent.Run -> ev.block(e)
-                is EngineEvent.Push -> e.pushCommand(ev.command)
             }
         }
+        val p = perspectiveProvider()
+        e.composeAndPresent(sceneProvider(), canvasWidth, canvasHeight, showChecker, viewport.inverseCoeffs(), sculptProvider(), p.enabled, p.fisheye, lassoProvider(), selectionProvider(), cursorProvider())
     }
 }
