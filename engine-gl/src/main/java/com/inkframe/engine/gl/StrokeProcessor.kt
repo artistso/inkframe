@@ -114,10 +114,19 @@ class StrokeProcessor(private val brush: Brush) {
         return dabs
     }
 
-    private fun dabAt(p: Vec2, pressure: Float, sizeMultiplier: Float = 1f): Dab = Dab(
-        center = p,
-        size = brush.diameterForPressure(pressure) * sizeMultiplier,
-        rotationRad = 0f,
-        flow = brush.flowForPressure(pressure),
-    )
+    private fun dabAt(p: Vec2, pressure: Float, sizeMultiplier: Float = 1f): Dab {
+        var finalSizeMult = sizeMultiplier
+        
+        // Velocity-Responsive Taper: If drawing fast, sharpen the start
+        if (drawVel > 15f && sizeMultiplier < 1f) {
+            finalSizeMult *= 0.7f // Sharper flick
+        }
+
+        return Dab(
+            center = p,
+            size = brush.diameterForPressure(pressure) * finalSizeMult,
+            rotationRad = 0f,
+            flow = brush.flowForPressure(pressure),
+        )
+    }
 }

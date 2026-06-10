@@ -541,7 +541,23 @@ class StudioState : ViewModel() {
         val cel = layer.cels[currentFrame] ?: return
         val strokes = cel.vectorData.strokes.toMutableList()
         val points = strokes[si].points.toMutableList()
-        points[pi] = points[pi].copy(pos = newPos)
+        
+        val delta = newPos - points[pi].pos
+        
+        if (shiftPressed) {
+            // "Segment Sculpt": Move neighboring nodes with a falloff (bell curve)
+            for (i in points.indices) {
+                val dist = Math.abs(i - pi).toFloat()
+                val influence = Math.exp(-dist * dist / 32.0).toFloat() // Gaussian falloff
+                if (influence > 0.01f) {
+                    points[i] = points[i].copy(pos = points[i].pos + delta * influence)
+                }
+            }
+        } else {
+            // Individual Node Sculpt
+            points[pi] = points[pi].copy(pos = newPos)
+        }
+        
         strokes[si] = strokes[si].copy(points = points)
         
         val newVector = cel.vectorData.copy(strokes = strokes)
