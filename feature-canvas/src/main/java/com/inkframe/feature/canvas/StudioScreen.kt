@@ -322,10 +322,8 @@ fun StudioScreen(state: StudioState = viewModel()) {
                 )
         ) {
             BrushRail(
-                current = state.brush,
+                state = state,
                 onSelect = { state.brush = it },
-                onOpenSettings = { state.showBrushSettings = true },
-                onOpenLibrary = { state.showBrushLibrary = true },
                 modifier = Modifier,
             )
             
@@ -785,65 +783,127 @@ private fun ModifierKeyButton(
 
 @Composable
 private fun BrushRail(
-    current: Brush,
+    state: StudioState,
     onSelect: (Brush) -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val current = state.brush
     Column(
         modifier
-            .width(60.dp)
+            .width(64.dp)
             .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         DefaultBrushes.all.forEach { b ->
             val selected = b.id == current.id
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (selected) ComposeBrush.radialGradient(listOf(Color.Cyan.copy(alpha = 0.2f), Color.Transparent))
-                        else Color.Transparent
+            val expanded = selected && state.brushSettingsExpanded
+            
+            Box(contentAlignment = Alignment.CenterStart) {
+                // The Main Brush Button
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (selected) ComposeBrush.radialGradient(listOf(Color.Cyan.copy(alpha = 0.2f), Color.Transparent))
+                            else Color.Transparent
+                        )
+                        .border(
+                            width = if (selected) 2.dp else 1.dp,
+                            color = if (selected) Color.Cyan else Color.White.copy(alpha = 0.15f),
+                            shape = CircleShape
+                        )
+                        .clickableNoRipple { 
+                            if (selected) state.brushSettingsExpanded = !state.brushSettingsExpanded
+                            else {
+                                onSelect(b)
+                                state.brushSettingsExpanded = false
+                            }
+                        }
+                ) {
+                    Text(
+                        text = b.name.take(1).uppercase(),
+                        color = if (selected) Color.Cyan else Color.White.copy(alpha = 0.7f),
+                        fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Normal,
+                        fontSize = 16.sp
                     )
-                    .border(
-                        width = if (selected) 2.dp else 1.dp,
-                        color = if (selected) Color.Cyan else Color.White.copy(alpha = 0.15f),
-                        shape = CircleShape
-                    )
-                    .clickableNoRipple { if (selected) onOpenSettings() else onSelect(b) }
-            ) {
-                Text(
-                    text = b.name.take(1).uppercase(),
-                    color = if (selected) Color.Cyan else Color.White.copy(alpha = 0.7f),
-                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Normal,
-                    fontSize = 16.sp
-                )
+                }
+
+                // The Baked-in Sub-menu (Horizontal Fibonacci Bloom)
+                if (expanded) {
+                    Row(
+                        modifier = Modifier
+                            .padding(start = 56.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.medium)
+                            .border(1.dp, Color.Cyan.copy(alpha = 0.2f), MaterialTheme.shapes.medium)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Compact integrated controls for the Pen
+                        IntegratedSlider(
+                            label = "Size", 
+                            value = current.sizePx, 
+                            range = BrushAdjustments.SIZE_RANGE,
+                            onValueChange = { state.updateBrush { BrushAdjustments.withSize(it, it.sizePx + it.sizePx * 0.1f * (if (it.sizePx < 50) 1f else 0.5f)) } } // placeholder for gesture
+                        )
+                        
+                        // We'll use a specific Pen tool focus here
+                        if (current.id == "kjg_ink" || current.id == "ink") {
+                            DonutIconButton(
+                                icon = Icons.Filled.Gesture, 
+                                contentDescription = "Taper", 
+                                active = current.taperStart > 0f,
+                                onClick = { state.updateBrush { it.copy(taperStart = if (it.taperStart > 0f) 0f else 0.2f) } }
+                            )
+                            DonutIconButton(
+                                icon = Icons.Filled.Repeat, 
+                                contentDescription = "Magnet", 
+                                active = current.vectorMagnet > 0f,
+                                onClick = { state.updateBrush { it.copy(vectorMagnet = if (it.vectorMagnet > 0f) 0f else 0.5f) } }
+                            )
+                        }
+                    }
+                }
             }
         }
+        
         // Button to expand/add more brushes
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(46.dp)
                 .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
-                .clickableNoRipple(onOpenLibrary)
+                .clickableNoRipple { state.showBrushLibrary = true }
         ) {
             Icon(Icons.Filled.Add, contentDescription = "More brushes", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
         }
-        
-        // Explicit settings (tune) button so the gesture is discoverable.
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(46.dp)
-                .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
-                .clickableNoRipple(onOpenSettings)
-        ) {
-            Icon(Icons.Filled.Tune, contentDescription = "Brush settings", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
-        }
+    }
+}
+
+@Composable
+private fun IntegratedSlider(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Color.Cyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        // A vertical "Donut" dial or simple text indicator that acts as a slider
+        Text(
+            "${value.toInt()}", 
+            color = Color.White, 
+            fontSize = 14.sp, 
+            modifier = Modifier.pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    onValueChange(dragAmount.y) // vertical drag to adjust
+                }
+            }
+        )
     }
 }
 

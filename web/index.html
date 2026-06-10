@@ -285,7 +285,7 @@
   // ===== Brush + frame engine (unchanged core) =====
   const brushes=[
     {id:'pencil',ic:'@pencil',size:6,op:1,hard:.95},
-    {id:'ink',ic:'@ink',size:14,op:1,hard:.9},
+    {id:'ink',ic:'@ink',size:14,op:1,hard:.9,taper:0.2,magnet:0.5},
     {id:'marker',ic:'@marker',size:40,op:.85,hard:.7},
     {id:'glow',ic:'@glow',size:64,op:.5,hard:.15},
     {id:'eraser',ic:'@eraser',size:40,op:1,hard:.8,erase:true},
@@ -982,8 +982,15 @@
   const nTools=makeNode({glyph:'@tools',label:'Tools',x:24,y:96});
   brushes.forEach(b=>{ const k=kidEl({glyph:b.ic,sub:b.id});
     k.dataset.id=b.id; if(b.id===brush.id)k.classList.add('on');
-    k.addEventListener('click',e=>{e.stopPropagation(); brush=b; size=b.size; opacity=b.op;
-      [...nTools._kids.children].forEach(c=>c.classList.toggle('on',c.dataset.id===b.id)); flash(b.id);});
+    k.addEventListener('click',e=>{e.stopPropagation(); 
+      if(brush.id === b.id) {
+        // Tapping again opens integrated settings
+        flash(b.id + ' · precision modes active');
+      } else {
+        brush=b; size=b.size; opacity=b.op;
+        [...nTools._kids.children].forEach(c=>c.classList.toggle('on',c.dataset.id===b.id)); flash(b.id);
+      }
+    });
     nTools._kids.appendChild(k); });
 
   // ---- LINE node (the Living Line: StreamLine smoothing + QuickShape) ----
@@ -1000,14 +1007,6 @@
 
   // ---- COLOR node ----
   const nColor=makeNode({glyph:'@color',label:'Color',x:0,y:96}); nColor.dataset.right='1';
-  // size dial
-  const sizeDial=kidEl({cls:'dial',glyph:'14',sub:'Size',build(k){const r=document.createElement('div');r.className='ring';k.insertBefore(r,k.firstChild);}});
-  makeDial(sizeDial,1,120,()=>size,v=>{size=v;sizeDial.querySelector('.glyph').textContent=Math.round(v);},'Size');
-  nColor._kids.appendChild(sizeDial);
-  // opacity dial
-  const opDial=kidEl({cls:'dial',glyph:'100',sub:'Opacity',build(k){const r=document.createElement('div');r.className='ring';k.insertBefore(r,k.firstChild);}});
-  makeDial(opDial,5,100,()=>Math.round(opacity*100),v=>{opacity=v/100;opDial.querySelector('.glyph').textContent=Math.round(v);},'Opacity');
-  nColor._kids.appendChild(opDial);
   // custom color
   const custom=kidEl({glyph:'@custom',sub:'Custom',build(k){const inp=document.createElement('input');inp.type='color';inp.value=color;
     inp.addEventListener('input',e=>{color=e.target.value;refreshSwatches();}); k.appendChild(inp);}});

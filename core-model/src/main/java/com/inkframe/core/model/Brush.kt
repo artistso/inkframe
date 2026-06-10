@@ -25,6 +25,9 @@ data class Brush(
     val postCorrection: Float = 0f,
     /** Snap start/end to existing lines (0.0 to 1.0 threshold). */
     val vectorMagnet: Float = 0f,
+    /** Length of the start/end taper as a fraction of stroke length (0.0 to 0.5). */
+    val taperStart: Float = 0.1f,
+    val taperEnd: Float = 0.2f,
     /** Whether this brush leaves a glowing vector trail animation. */
     val glowTrail: Boolean = false,
     /** Whether to snap rough sketches to perfect geometric shapes. */

@@ -33,8 +33,10 @@ class StrokeProcessor(private val brush: Brush) {
     private var stablePos: Vec2? = null
     private var carry = 0f // leftover distance from previous segment
 
+    private var currentStrokeLength = 0f
+
     fun reset() {
-        raw.clear(); smoothed = null; stablePos = null; carry = 0f
+        raw.clear(); smoothed = null; stablePos = null; carry = 0f; currentStrokeLength = 0f
     }
 
     /** Pushes a sample and returns any dabs produced since the previous call. */
@@ -95,18 +97,26 @@ class StrokeProcessor(private val brush: Brush) {
                 dabs.add(dabAt(p, pressure)); continue
             }
             val last = dabs.last().center
-            carry += p.distanceTo(last)
+            val dStep = p.distanceTo(last)
+            carry += dStep
+            currentStrokeLength += dStep
+            
             if (carry >= step) {
                 carry = 0f
-                dabs.add(dabAt(p, pressure))
+                // We'll use a fixed pixel distance for taper during live drawing
+                // since we don't know the total length yet.
+                val taperPx = brush.sizePx * 4f
+                val startMult = if (taperPx > 0) (currentStrokeLength / taperPx).coerceIn(0f, 1f) else 1f
+                
+                dabs.add(dabAt(p, pressure, startMult))
             }
         }
         return dabs
     }
 
-    private fun dabAt(p: Vec2, pressure: Float): Dab = Dab(
+    private fun dabAt(p: Vec2, pressure: Float, sizeMultiplier: Float = 1f): Dab = Dab(
         center = p,
-        size = brush.diameterForPressure(pressure),
+        size = brush.diameterForPressure(pressure) * sizeMultiplier,
         rotationRad = 0f,
         flow = brush.flowForPressure(pressure),
     )

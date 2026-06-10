@@ -62,6 +62,8 @@ class StudioState : ViewModel() {
     var showBrushLibrary by mutableStateOf(false)
     /** Whether the timeline is expanded in its Fibonacci shell state. */
     var timelineExpanded by mutableStateOf(false)
+    /** Whether the current brush's integrated settings are expanded. */
+    var brushSettingsExpanded by mutableStateOf(false)
     /** Id of the layer currently being renamed (shows the rename dialog), or null. */
     var renamingLayerId by mutableStateOf<String?>(null)
 
