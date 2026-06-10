@@ -40,6 +40,15 @@ class CanvasView(
     private val onEngineReady: (PaintEngine) -> Unit,
 ) : GLSurfaceView(context) {
 
+    interface SculptListener {
+        fun onNodeBegin(pos: Vec2): Boolean
+        fun onNodeMove(pos: Vec2)
+        fun onNodeEnd()
+    }
+
+    var sculptListener: SculptListener? = null
+    var sculptActive: Boolean = false
+
     /** What to draw with right now and where (the active cel's surface). */
     data class StrokeConfig(
         val targetSurfaceId: Long,
@@ -345,7 +354,7 @@ class CanvasView(
 
     // --- Input arbitration: 1 pointer draws, 2 pointers navigate ------------
 
-    private enum class Mode { IDLE, DRAW, NAVIGATE }
+    private enum class Mode { IDLE, DRAW, NAVIGATE, SCULPT }
     private var mode = Mode.IDLE
     private val currentStrokePoints = ArrayList<com.inkframe.core.model.StrokePoint>()
     private var strokeStartTime = 0L
@@ -412,6 +421,15 @@ class CanvasView(
                         mode = Mode.IDLE
                         floodFillAtView(event.getX(0), event.getY(0))
                     }
+                    sculptActive -> {
+                        val canvasPos = toCanvas(event.getX(0), event.getY(0))
+                        val caught = sculptListener?.onNodeBegin(canvasPos) ?: false
+                        if (caught) {
+                            mode = Mode.SCULPT
+                        } else {
+                            mode = Mode.IDLE
+                        }
+                    }
                     else -> {
                         mode = Mode.DRAW
                         strokeStartTime = event.eventTime
@@ -454,6 +472,11 @@ class CanvasView(
                     updateNavigation(event)
                     requestRender()
                 }
+                Mode.SCULPT -> {
+                    val canvasPos = toCanvas(event.getX(0), event.getY(0))
+                    sculptListener?.onNodeMove(canvasPos)
+                    requestRender()
+                }
                 Mode.IDLE -> {}
             }
 
@@ -474,6 +497,8 @@ class CanvasView(
                         points = ArrayList(currentStrokePoints)
                     )
                     post { onStrokeFinished?.invoke(data) }
+                } else if (mode == Mode.SCULPT) {
+                    sculptListener?.onNodeEnd()
                 }
                 mode = Mode.IDLE
                 navIdA = -1; navIdB = -1

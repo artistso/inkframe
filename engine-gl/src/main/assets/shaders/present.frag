@@ -61,6 +61,17 @@ void main() {
     vec4 col = texture(uCanvas, uv);
     vec3 outRgb = mix(bg, col.rgb, col.a);
     
+    // Fractal Chromatic Aberration
+    // Splits RGB channels based on distance from the horizon (center Y)
+    float horizonDist = abs(uv.y - 0.5);
+    float abStrength = pow(horizonDist, 2.0) * 0.02 * (1.0 + noise(uv * 10.0) * 0.5);
+    
+    if (abStrength > 0.001 && col.a > 0.1) {
+        float r = texture(uCanvas, uv + vec2(abStrength, 0.0)).r;
+        float b = texture(uCanvas, uv - vec2(abStrength, 0.0)).b;
+        outRgb = vec3(r, outRgb.g, b);
+    }
+    
     // Fractal Paper Grain
     float grain = noise(uv * 500.0) * 0.05 + noise(uv * 1000.0) * 0.02;
     outRgb += grain * (1.0 - col.a); // Only apply to background/transparent areas

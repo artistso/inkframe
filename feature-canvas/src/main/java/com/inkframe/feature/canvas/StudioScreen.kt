@@ -398,6 +398,22 @@ fun StudioScreen(state: StudioState = viewModel()) {
                         ).also { view ->
                             canvasView = view
                             view.onStrokeFinished = { state.recordStroke(it) }
+                            view.sculptListener = object : CanvasView.SculptListener {
+                                override fun onNodeBegin(pos: Vec2): Boolean {
+                                    val node = state.findNodeAt(pos, 24f / state.zoomPercent * 100f)
+                                    if (node != null) {
+                                        state.activeSculptNode = node
+                                        return true
+                                    }
+                                    return false
+                                }
+                                override fun onNodeMove(pos: Vec2) {
+                                    state.moveActiveNode(pos)
+                                }
+                                override fun onNodeEnd() {
+                                    state.activeSculptNode = null
+                                }
+                            }
                             // Engine history callbacks fire on the GL thread; bounce a
                             // redraw request back so the toolbar reflects new state.
                             state.onUiInvalidate = { view.requestRender() }
@@ -412,6 +428,7 @@ fun StudioScreen(state: StudioState = viewModel()) {
                             }
                             // Eyedropper: arm state -> view, and feed sampled colour back.
                             view.eyedropperActive = state.eyedropperActive
+                            view.sculptActive = state.sculptMode
                             view.onColorSampled = { sampled ->
                                 state.eyedropperActive = false   // one-shot: disarm after a pick
                                 view.eyedropperActive = false
@@ -432,6 +449,12 @@ fun StudioScreen(state: StudioState = viewModel()) {
                         }
                     },
                     modifier = Modifier.fillMaxSize(),
+                    update = { view ->
+                        view.eyedropperActive = state.eyedropperActive
+                        view.fillActive = state.fillActive
+                        view.sculptActive = state.sculptMode
+                        view.setShowChecker(state.showChecker)
+                    }
                 )
             }
             // Fibonacci Timeline Shell

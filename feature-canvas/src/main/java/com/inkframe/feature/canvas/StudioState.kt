@@ -52,6 +52,8 @@ class StudioState : ViewModel() {
     var eyedropperActive by mutableStateOf(false)
     /** Whether the "Sculpt" (Quantum Path) mode is active. */
     var sculptMode by mutableStateOf(false)
+    /** The node currently being dragged in Sculpt Mode: (StrokeIndex, PointIndex) */
+    var activeSculptNode by mutableStateOf<Pair<Int, Int>?>(null)
     /** Whether the bucket/fill tool is armed (next canvas tap flood-fills). */
     var fillActive by mutableStateOf(false)
     /** Whether the brush settings panel is open. */
@@ -509,6 +511,41 @@ class StudioState : ViewModel() {
         }
         
         onUiInvalidate?.invoke()
+    }
+
+    /** Records a finished vector stroke into the model for the active cel. */
+    fun recordStroke(data: com.inkframe.core.model.StrokeData) {
+        // ... (existing recordStroke logic)
+    }
+
+    /** Finds the node closest to [pos] within [threshold] pixels. */
+    fun findNodeAt(pos: Vec2, threshold: Float): Pair<Int, Int>? {
+        val cel = activeLayer.cels[currentFrame] ?: return null
+        val strokes = cel.vectorData.strokes
+        for (si in strokes.indices) {
+            for (pi in strokes[si].points.indices) {
+                if (strokes[si].points[pi].pos.distanceTo(pos) < threshold) {
+                    return Pair(si, pi)
+                }
+            }
+        }
+        return null
+    }
+
+    /** Moves the currently active sculpt node to [newPos]. */
+    fun moveActiveNode(newPos: Vec2) {
+        val (si, pi) = activeSculptNode ?: return
+        val layer = activeLayer
+        val cel = layer.cels[currentFrame] ?: return
+        val strokes = cel.vectorData.strokes.toMutableList()
+        val points = strokes[si].points.toMutableList()
+        points[pi] = points[pi].copy(pos = newPos)
+        strokes[si] = strokes[si].copy(points = points)
+        
+        val newVector = cel.vectorData.copy(strokes = strokes)
+        updateLayer(layer.id) { l ->
+            l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))
+        }
     }
 
     private fun updateScene(transform: (Scene) -> Scene) {
