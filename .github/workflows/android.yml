@@ -1,4 +1,4 @@
-name: InkFrame Build
+name: InkFrame Master Build
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Build APK
+    name: Build & Publish Release APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,32 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: wrapper
+          cache-overwrite-existing: true
 
-      - name: Build
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Create Release and Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: InkFrame Studio - Master Build
+          body: |
+            ## The Glass Horizon Build
+            
+            This is the latest production-ready build of **InkFrame Studio**.
+            
+            ### Master Features Included:
+            - **Andrew Kramer Saber Glow**: Energetic plasma-flicker ink trails.
+            - **Kim Jung Gi Perspective**: Real-time curvilinear fisheye grids.
+            - **Stan Proko Nodes**: High-intensity structural landmarks for sculpting.
+            - **CSP Vector Magnet**: Seamless path snapping and merging.
+            - **Fibonacci Bloom**: Organic mathematical UI expansion.
+          files: app/build/outputs/apk/debug/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

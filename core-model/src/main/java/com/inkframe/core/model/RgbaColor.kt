@@ -27,6 +27,7 @@ data class RgbaColor(
     companion object {
         val BLACK = RgbaColor(0f, 0f, 0f)
         val WHITE = RgbaColor(1f, 1f, 1f)
+        val CYAN = RgbaColor(0f, 0.9f, 1f)
         val TRANSPARENT = RgbaColor(0f, 0f, 0f, 0f)
 
         fun fromArgb(argb: Int): RgbaColor = RgbaColor(
