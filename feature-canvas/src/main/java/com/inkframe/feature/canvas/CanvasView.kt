@@ -50,6 +50,7 @@ class CanvasView(
         fun onLassoBegin(pos: Vec2)
         fun onLassoMove(pos: Vec2)
         fun onLassoEnd()
+        fun onCursorMove(pos: Vec2)
     }
 
     var sculptListener: SculptListener? = null
@@ -57,6 +58,9 @@ class CanvasView(
     var ctrlActive: Boolean = false
     var shiftActive: Boolean = false
     var altActive: Boolean = false
+    
+    var symmetryEnabled: Boolean = false
+    var symmetryCount: Int = 0
 
     /** What to draw with right now and where (the active cel's surface). */
     data class StrokeConfig(
@@ -428,7 +432,7 @@ class CanvasView(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val canvasPos = toCanvas(event.getX(0), event.getY(0))
-                state.cursorPosition = canvasPos
+                sculptListener?.onCursorMove(canvasPos)
                 
                 when {
                     eyedropperActive -> {
@@ -464,7 +468,7 @@ class CanvasView(
                         renderer.post(
                             CanvasRenderer.EngineEvent.Begin(
                                 cfg.targetSurfaceId, cfg.brush, cfg.color, s,
-                                symmetryCount = if (state.symmetryEnabled) state.symmetryCount else 0
+                                symmetryCount = if (symmetryEnabled) symmetryCount else 0
                             )
                         )
                         requestRender()
@@ -482,11 +486,11 @@ class CanvasView(
 
             MotionEvent.ACTION_MOVE -> {
                 val canvasPos = toCanvas(event.getX(0), event.getY(0))
-                state.cursorPosition = canvasPos
+                sculptListener?.onCursorMove(canvasPos)
                 
                 // Node Insight: Reveal nodes as cursor passes over them
-                if (state.sculptMode) {
-                    state.hoveredNode = state.findNodeAt(canvasPos, 30f / viewport.scale)
+                if (sculptActive) {
+                    // callback through listener
                 }
 
                 when (mode) {
@@ -542,8 +546,6 @@ class CanvasView(
                     sculptListener?.onLassoEnd()
                 }
                 mode = Mode.IDLE
-                state.activeSculptNode = null
-                state.cursorPosition = null
                 navIdA = -1; navIdB = -1
                 requestRender()
             }

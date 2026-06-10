@@ -367,37 +367,6 @@ fun StudioScreen(state: StudioState = viewModel()) {
                 },
                 onToggleChecker = {
                     state.showChecker = !state.showChecker
-                    canvasView?.setShowChecker(state.showChecker)
-                },
-            )
-            Box(Modifier.weight(1f)) {
-                if (state.showVfxHud) { VfxHud(state) }
-                AndroidView(
-                    factory = { ctx ->
-                        CanvasView(
-                            context = ctx,
-                            canvasWidth = state.project.canvas.widthPx,
-                            canvasHeight = state.project.canvas.heightPx,
-                            sceneProvider = { state.buildDrawList() },
-                            sculptProvider = {
-                                if (state.sculptMode) {
-                                    state.activeLayer.cels[state.currentFrame]?.vectorData?.strokes ?: emptyList()
-                                } else emptyList()
-                            },
-                            perspectiveProvider = {
-                                CanvasRenderer.PerspectiveConfig(state.perspectiveEnabled, state.perspectiveFisheye)
-                            },
-                            lassoProvider = { state.lassoPath },
-                            selectionProvider = { state.selectedNodes },
-                            cursorProvider = { state.cursorPosition },
-                            strokeConfig = {
-                                val sid = state.ensureActiveCel()
-                                CanvasView.StrokeConfig(
-                                    sid, state.brush, state.color,
-                                    shiftPressed = state.shiftPressed,
-                                    altPressed = state.altPressed,
-                                    ctrlPressed = state.ctrlPressed
-                                )
                             },
                             onEngineReady = { engine -> state.bindEngine(engine) },
                         ).also { view ->
@@ -427,6 +396,12 @@ fun StudioScreen(state: StudioState = viewModel()) {
                                 }
                                 override fun onLassoEnd() {
                                     state.selectNodesInLasso()
+                                }
+                                override fun onCursorMove(pos: Vec2) {
+                                    state.cursorPosition = pos
+                                    if (state.sculptMode) {
+                                        state.hoveredNode = state.findNodeAt(pos, 30f / (state.zoomPercent / 100f))
+                                    }
                                 }
                             }
                             // Engine history callbacks fire on the GL thread; bounce a
@@ -471,6 +446,8 @@ fun StudioScreen(state: StudioState = viewModel()) {
                         view.ctrlActive = state.ctrlPressed
                         view.shiftActive = state.shiftPressed
                         view.altActive = state.altPressed
+                        view.symmetryEnabled = state.symmetryEnabled
+                        view.symmetryCount = state.symmetryCount
                         view.setShowChecker(state.showChecker)
                     }
                 )
