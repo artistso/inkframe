@@ -497,11 +497,15 @@ class CanvasView(
                     Mode.DRAW -> {
                         for (h in 0 until event.historySize) {
                             val s = sample(0, h)
-                            currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
+                            if (currentStrokePoints.size < 1000) {
+                                currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
+                            }
                             renderer.post(CanvasRenderer.EngineEvent.Extend(s))
                         }
                         val s = sample(0)
-                        currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
+                        if (currentStrokePoints.size < 1000) {
+                            currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
+                        }
                         renderer.post(CanvasRenderer.EngineEvent.Extend(s))
                         requestRender()
                     }

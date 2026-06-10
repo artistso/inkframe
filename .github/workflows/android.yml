@@ -21,13 +21,15 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: wrapper
+          # Optimization: Disable dependency graph during build to save memory
+          dependency-graph: disabled
 
       - name: Grant execute permission
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace --max-workers=4
+        # assembleDebug is the lightest build task
+        run: ./gradlew assembleDebug --no-daemon --max-workers=2 --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

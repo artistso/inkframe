@@ -14,7 +14,7 @@ interface Command {
  * Bounded undo/redo history. New commands clear the redo branch. The capacity guard
  * keeps memory bounded for long drawing sessions.
  */
-class UndoStack(private val capacity: Int = 200) {
+class UndoStack(private val capacity: Int = 25) {
     private val undo = ArrayDeque<Command>()
     private val redo = ArrayDeque<Command>()
 
