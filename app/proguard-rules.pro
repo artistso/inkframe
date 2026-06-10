@@ -1,5 +1,12 @@
-# Keep GLSL-driven classes that are reflected over by name (none currently), and
-# keep model data classes intact for future serialization.
+# Project Model
 -keep class com.inkframe.core.model.** { *; }
 
-# Compose already ships consumer rules via AndroidX; nothing extra required here.
+# Prevent shrinking of Enums used in JSON (BlendMode)
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+
+# Compose rules
+-keep class androidx.compose.ui.platform.** { *; }
+-keep class androidx.compose.runtime.** { *; }
