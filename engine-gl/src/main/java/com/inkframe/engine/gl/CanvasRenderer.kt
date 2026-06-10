@@ -3,6 +3,7 @@ package com.inkframe.engine.gl
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
+import com.inkframe.core.common.Vec2
 import com.inkframe.core.common.ViewportTransform
 import com.inkframe.core.model.Brush
 import com.inkframe.core.model.RgbaColor

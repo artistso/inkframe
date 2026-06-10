@@ -6,35 +6,17 @@ import android.opengl.GLSurfaceView
 import android.view.MotionEvent
 import com.inkframe.core.common.Vec2
 import com.inkframe.core.common.ViewportTransform
-import com.inkframe.core.model.Brush
-import com.inkframe.core.model.ExportPlanner
-import com.inkframe.core.model.Project
-import com.inkframe.core.model.ProjectPackage
-import com.inkframe.core.model.RgbaColor
-import com.inkframe.engine.gl.CanvasRenderer
-import com.inkframe.engine.gl.InputSample
-import com.inkframe.engine.gl.PaintEngine
-import com.inkframe.engine.gl.SurfaceBackupStore
-import java.io.BufferedInputStream
-import java.io.BufferedOutputStream
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.InputStream
-import java.io.OutputStream
+import com.inkframe.core.model.*
+import com.inkframe.engine.gl.*
+import java.io.*
 
-/**
- * A GLSurfaceView that hosts the GPU paint engine and translates stylus/touch
- * MotionEvents (including historical batched samples and pressure) into engine
- * stroke events. Configured for OpenGL ES 3.0, RGBA8888, dirty rendering.
- */
 @SuppressLint("ViewConstructor")
 class CanvasView(
     context: Context,
     canvasWidth: Int,
     canvasHeight: Int,
     private val sceneProvider: () -> List<PaintEngine.LayerDrawSpec>,
-    private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData> = { emptyList() },
+    private val sculptProvider: () -> List<StrokeData> = { emptyList() },
     private val perspectiveProvider: () -> CanvasRenderer.PerspectiveConfig = { CanvasRenderer.PerspectiveConfig() },
     private val lassoProvider: () -> List<Vec2> = { emptyList() },
     private val selectionProvider: () -> List<Pair<Int, Int>> = { emptyList() },
@@ -42,6 +24,8 @@ class CanvasView(
     private val strokeConfig: () -> StrokeConfig,
     private val onEngineReady: (PaintEngine) -> Unit,
 ) : GLSurfaceView(context) {
+
+    data class StrokeConfig(val targetSurfaceId: Long, val brush: Brush, val color: RgbaColor, val shiftPressed: Boolean = false, val altPressed: Boolean = false, val ctrlPressed: Boolean = false)
 
     interface SculptListener {
         fun onNodeBegin(pos: Vec2): Boolean
@@ -56,539 +40,121 @@ class CanvasView(
     var sculptListener: SculptListener? = null
     var sculptActive: Boolean = false
     var ctrlActive: Boolean = false
-    var shiftActive: Boolean = false
-    var altActive: Boolean = false
-    
     var symmetryEnabled: Boolean = false
     var symmetryCount: Int = 0
 
-    /** What to draw with right now and where (the active cel's surface). */
-    data class StrokeConfig(
-        val targetSurfaceId: Long,
-        val brush: Brush,
-        val color: RgbaColor,
-        val shiftPressed: Boolean = false,
-        val altPressed: Boolean = false,
-        val ctrlPressed: Boolean = false
-    )
-
-    private val renderer: CanvasRenderer
-
-    /** CPU-side artwork backup; survives EGL-context loss so we can restore after it. */
-    private val backupStore = SurfaceBackupStore()
+    private val renderer = CanvasRenderer(context, canvasWidth, canvasHeight, sceneProvider, sculptProvider, perspectiveProvider, lassoProvider, selectionProvider, cursorProvider, onEngineReady, SurfaceBackupStore())
 
     init {
         setEGLContextClientVersion(3)
         setEGLConfigChooser(8, 8, 8, 8, 0, 0)
-        // First line of defence: ask the system to keep the EGL context across pauses.
-        // Many devices honour this, avoiding loss entirely; the backup store covers the
-        // rest (low-memory devices / forced context loss).
         preserveEGLContextOnPause = true
-        renderer = CanvasRenderer(
-            context = context,
-            canvasWidth = canvasWidth,
-            canvasHeight = canvasHeight,
-            sceneProvider = sceneProvider,
-            sculptProvider = sculptProvider,
-            perspectiveProvider = perspectiveProvider,
-            lassoProvider = lassoProvider,
-            selectionProvider = selectionProvider,
-            cursorProvider = cursorProvider,
-            onEngineReady = onEngineReady,
-            backupStore = backupStore,
-            onContextRestored = { post { onContextRestored?.invoke() } },
-        )
         setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY
     }
 
-    /** Invoked after the GL context was lost and artwork re-uploaded (on the main thread). */
-    var onContextRestored: (() -> Unit)? = null
-
-    /** When true, a single-finger tap samples a colour instead of drawing (eyedropper). */
-    @Volatile var eyedropperActive: Boolean = false
-
-    /** When true, a single-finger tap flood-fills instead of drawing (bucket). */
-    @Volatile var fillActive: Boolean = false
-
-    /** Invoked (main thread) after a fill; arg = whether anything changed. */
-    var onFilled: ((Boolean) -> Unit)? = null
-
-    /** Flood-fills the active cel at a view-space point with the current stroke colour. */
-    private fun floodFillAtView(vx: Float, vy: Float) {
-        val cfg = strokeConfig()
-        val canvas = toCanvas(vx, vy)
-        val px = canvas.x.toInt()
-        val py = canvas.y.toInt()
-        renderer.post(
-            CanvasRenderer.EngineEvent.Run { engine ->
-                val changed = engine.floodFill(cfg.targetSurfaceId, px, py, cfg.color)
-                post { onFilled?.invoke(changed) }
-            },
-        )
-        requestRender()
-    }
-
-    /**
-     * Invoked (on the main thread) when the eyedropper samples a colour. `null` means the
-     * tap hit a transparent / off-canvas area.
-     */
-    var onColorSampled: ((RgbaColor?) -> Unit)? = null
-
-    /** Samples the composited colour at a view-space point and reports it via [onColorSampled]. */
-    private fun sampleColorAtView(vx: Float, vy: Float) {
-        val canvas = toCanvas(vx, vy)
-        val px = canvas.x.toInt()
-        val py = canvas.y.toInt()
-        val specs = sceneProvider()
-        renderer.post(
-            CanvasRenderer.EngineEvent.Run { engine ->
-                val sampled = engine.sampleColorAt(specs, px, py)
-                post { onColorSampled?.invoke(sampled) }
-            },
-        )
-        requestRender()
-    }
-
-    override fun onPause() {
-        // Snapshot artwork to the CPU-side store *before* the GL thread pauses, so it can
-        // be restored if the EGL context is destroyed while backgrounded.
-        renderer.backupSurfaces()
-        requestRender()  // flush the queued backup before the GL thread idles
-        super.onPause()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        requestRender()
-    }
-
-    fun setShowChecker(show: Boolean) {
-        renderer.showChecker = show
-        requestRender()
-    }
-
-    /** Posts an arbitrary engine command (e.g. allocate a surface) to the GL thread. */
-    fun runOnEngine(block: (PaintEngine) -> Unit) {
-        renderer.post(CanvasRenderer.EngineEvent.Run(block))
-        requestRender()
-    }
-
-    /** Requests an undo on the GL thread. */
-    fun undo() {
-        renderer.post(CanvasRenderer.EngineEvent.Undo)
-        requestRender()
-    }
-
-    /** Pushes a command to the engine's undo stack. */
-    fun pushCommand(command: com.inkframe.core.common.Command) {
-        renderer.post(CanvasRenderer.EngineEvent.Push(command))
-    }
-
-    /** Requests a redo on the GL thread. */
-    fun redo() {
-        renderer.post(CanvasRenderer.EngineEvent.Redo)
-        requestRender()
-    }
-
-    /**
-     * Saves [project] (document + cel pixels) to [file] as an `.inkframe` package. The
-     * pixel read-back happens on the GL thread; [onResult] is invoked there with success
-     * or the thrown error. The caller should marshal UI updates back to the main thread.
-     */
-    fun saveProject(project: Project, file: File, onResult: (Result<Unit>) -> Unit) {
-        runOnEngine { engine ->
-            val result = runCatching {
-                file.parentFile?.mkdirs()
-                BufferedOutputStream(FileOutputStream(file)).use { out ->
-                    ProjectPackage.write(project, engine.celImageIO(), out)
-                }
-            }
-            onResult(result)
-        }
-    }
-
-    /**
-     * Loads an `.inkframe` package from [file], restoring cel pixels onto fresh GPU
-     * surfaces. Returns the decoded [Project] via [onResult] (on the GL thread). The
-     * engine's existing surfaces and undo history are discarded first.
-     */
-    fun loadProject(file: File, onResult: (Result<Project>) -> Unit) {
-        runOnEngine { engine ->
-            val result = runCatching {
-                engine.resetForLoad()
-                BufferedInputStream(FileInputStream(file)).use { input ->
-                    ProjectPackage.read(engine.celImageIO(), input)
-                }
-            }
-            onResult(result)
-            requestRender()
-        }
-    }
-
-    /**
-     * Exports an animation to [file] in the given [format]. Rendering each frame happens
-     * on the GL thread; [drawListFor] maps a timeline frame index to its export draw list
-     * (typically `StudioState::buildExportDrawList`). [onResult] is invoked on the GL
-     * thread; the host marshals UI updates back to the main thread.
-     */
-    fun exportAnimation(
-        plan: ExportPlanner.ExportPlan,
-        format: ExportManager.ExportFormat,
-        file: File,
-        drawListFor: (Int) -> List<PaintEngine.LayerDrawSpec>,
-        onProgress: ((Int, Int) -> Unit)? = null,
-        onResult: (Result<File>) -> Unit,
-    ) {
-        runOnEngine { engine ->
-            val result = runCatching {
-                file.parentFile?.mkdirs()
-                val renderer: (Int) -> IntArray = { frameIndex ->
-                    engine.renderFrameToArgb(drawListFor(frameIndex))
-                }
-                val progress = onProgress?.let { cb -> ExportManager.Progress { d, t -> cb(d, t) } }
-                when (format) {
-                    // MP4 needs a real file path (MediaMuxer), not a stream.
-                    ExportManager.ExportFormat.MP4 ->
-                        ExportManager.exportMp4(plan, file, renderer, progress)
-                    ExportManager.ExportFormat.GIF ->
-                        FileOutputStream(file).use { out -> ExportManager.exportGif(plan, out, renderer, progress) }
-                    ExportManager.ExportFormat.PNG_SEQUENCE ->
-                        FileOutputStream(file).use { out ->
-                            ExportManager.exportPngSequence(plan, out, frameRenderer = renderer, progress = progress)
-                        }
-                }
-                file
-            }
-            onResult(result)
-        }
-    }
-
-    // --- Storage Access Framework (stream/fd) variants ----------------------
-    // SAF hands us content:// Uris; the host opens streams/fds from a ContentResolver and
-    // passes them here. These mirror the File-based methods but write to the given target.
-
-    /** Saves the project to a SAF [out] stream (caller owns/closes the underlying Uri). */
-    fun saveProjectTo(project: Project, out: OutputStream, onResult: (Result<Unit>) -> Unit) {
-        runOnEngine { engine ->
-            val result = runCatching {
-                BufferedOutputStream(out).use { ProjectPackage.write(project, engine.celImageIO(), it) }
-            }
-            onResult(result)
-        }
-    }
-
-    /** Loads a project from a SAF [input] stream. */
-    fun loadProjectFrom(input: InputStream, onResult: (Result<Project>) -> Unit) {
-        runOnEngine { engine ->
-            val result = runCatching {
-                engine.resetForLoad()
-                BufferedInputStream(input).use { ProjectPackage.read(engine.celImageIO(), it) }
-            }
-            onResult(result)
-            requestRender()
-        }
-    }
-
-    /**
-     * Exports to a SAF target. GIF/PNG use the [out] stream; MP4 uses [fd] (MediaMuxer
-     * needs a seekable file descriptor). The caller supplies whichever the format needs.
-     */
-    fun exportAnimationTo(
-        plan: ExportPlanner.ExportPlan,
-        format: ExportManager.ExportFormat,
-        out: OutputStream?,
-        fd: java.io.FileDescriptor?,
-        drawListFor: (Int) -> List<PaintEngine.LayerDrawSpec>,
-        onProgress: ((Int, Int) -> Unit)? = null,
-        onResult: (Result<Unit>) -> Unit,
-    ) {
-        runOnEngine { engine ->
-            val result = runCatching {
-                val renderer: (Int) -> IntArray = { frameIndex ->
-                    engine.renderFrameToArgb(drawListFor(frameIndex))
-                }
-                val progress = onProgress?.let { cb -> ExportManager.Progress { d, t -> cb(d, t) } }
-                when (format) {
-                    ExportManager.ExportFormat.MP4 -> {
-                        val descriptor = requireNotNull(fd) { "MP4 export needs a FileDescriptor" }
-                        ExportManager.exportMp4(plan, descriptor, renderer, progress)
-                    }
-                    ExportManager.ExportFormat.GIF -> {
-                        val stream = requireNotNull(out) { "GIF export needs an OutputStream" }
-                        ExportManager.exportGif(plan, stream, renderer, progress)
-                    }
-                    ExportManager.ExportFormat.PNG_SEQUENCE -> {
-                        val stream = requireNotNull(out) { "PNG export needs an OutputStream" }
-                        ExportManager.exportPngSequence(plan, stream, frameRenderer = renderer, progress = progress)
-                    }
-                }
-            }
-            onResult(result)
-        }
-    }
-
-    // --- Viewport (pan / zoom / rotate) -------------------------------------
-
-    private var viewW = 1f
-    private var viewH = 1f
-    private val canvasW = canvasWidth.toFloat()
-    private val canvasH = canvasHeight.toFloat()
-    private var viewportInitialized = false
-
-    private var viewport: ViewportTransform = ViewportTransform.IDENTITY
-        set(value) {
-            field = value
-            renderer.viewport = value
-            onViewportChanged?.invoke(value.scale)
-        }
-
-    /** Notifies the host of zoom changes (e.g. to show a zoom %). */
-    var onViewportChanged: ((scale: Float) -> Unit)? = null
-
-    private var minScale = 0.05f
-    private var maxScale = 32f
-
-    /** Resets the view to frame the whole canvas (aspect-fit, no rotation). */
-    fun fitToScreen() {
-        viewport = ViewportTransform.fit(canvasW, canvasH, viewW, viewH)
-        requestRender()
-    }
-
-    /** Resets to 1:1 (100%) centered. */
-    fun resetZoom() {
-        val bx = (viewW - canvasW) * 0.5f
-        val by = (viewH - canvasH) * 0.5f
-        viewport = ViewportTransform(1f, 0f, bx, by)
-        requestRender()
-    }
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        viewW = w.toFloat().coerceAtLeast(1f)
-        viewH = h.toFloat().coerceAtLeast(1f)
-        if (!viewportInitialized) {
-            viewportInitialized = true
-            fitToScreen()
-        }
-    }
-
-    // --- Input arbitration: 1 pointer draws, 2 pointers navigate ------------
-
-    private enum class Mode { IDLE, DRAW, NAVIGATE, SCULPT, LASSO }
     private var mode = Mode.IDLE
-    private val currentStrokePoints = ArrayList<com.inkframe.core.model.StrokePoint>()
+    private enum class Mode { IDLE, DRAW, NAVIGATE, SCULPT, LASSO }
+    private val currentStrokePoints = ArrayList<StrokePoint>()
     private var strokeStartTime = 0L
     private var strokeOrigin: Vec2? = null
 
-    /** Invoked (main thread) when a stroke finishes; carries the vector path data. */
-    var onStrokeFinished: ((com.inkframe.core.model.StrokeData) -> Unit)? = null
+    var onStrokeFinished: ((StrokeData) -> Unit)? = null
 
-    // Cached previous positions of the two navigation pointers (by pointer id).
     private var navIdA = -1
     private var navIdB = -1
     private var prevAx = 0f; private var prevAy = 0f
     private var prevBx = 0f; private var prevBy = 0f
 
-    private fun toCanvas(vx: Float, vy: Float): Vec2 = viewport.viewToCanvas(Vec2(vx, vy))
+    private fun toCanvas(vx: Float, vy: Float): Vec2 = renderer.viewport.viewToCanvas(Vec2(vx, vy))
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val cfg = strokeConfig()
-
+        
         fun sample(idx: Int, hist: Int = -1): InputSample {
-            val x: Float; val y: Float; val p: Float
-            if (hist >= 0) {
-                x = event.getHistoricalX(idx, hist)
-                y = event.getHistoricalY(idx, hist)
-                p = event.getHistoricalPressure(idx, hist).coerceIn(0f, 1f)
-            } else {
-                x = event.getX(idx); y = event.getY(idx)
-                p = event.getPressure(idx).coerceIn(0f, 1f)
-            }
-            val pressure = if (p <= 0f) 0.5f else p
-            var canvasPos = toCanvas(x, y)
-            
-            // SHIFT precision: Lock to 15-degree increments or axis-lock
-            if (cfg.shiftPressed && strokeOrigin != null && mode == Mode.DRAW) {
-                val origin = strokeOrigin!!
-                val delta = canvasPos - origin
-                val dist = delta.length()
-                if (dist > 0.01f) {
-                    val angle = Math.atan2(delta.y.toDouble(), delta.x.toDouble())
-                    // Round to nearest 15 degrees (PI / 12)
-                    val step = Math.PI / 12.0
-                    val snappedAngle = Math.round(angle / step) * step
-                    canvasPos = origin + Vec2(
-                        (Math.cos(snappedAngle) * dist).toFloat(),
-                        (Math.sin(snappedAngle) * dist).toFloat()
-                    )
-                }
-            }
-            
-            return InputSample(canvasPos, pressure, event.eventTime)
+            val x = if (hist >= 0) event.getHistoricalX(idx, hist) else event.getX(idx)
+            val y = if (hist >= 0) event.getHistoricalY(idx, hist) else event.getY(idx)
+            val p = (if (hist >= 0) event.getHistoricalPressure(idx, hist) else event.getPressure(idx)).coerceIn(0f, 1f)
+            return InputSample(toCanvas(x, y), if (p <= 0f) 0.5f else p, event.eventTime)
         }
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val canvasPos = toCanvas(event.getX(0), event.getY(0))
                 sculptListener?.onCursorMove(canvasPos)
-                
-                when {
-                    eyedropperActive -> {
-                        // Eyedropper: sample the colour under the finger; don't draw.
-                        mode = Mode.IDLE
-                        sampleColorAtView(event.getX(0), event.getY(0))
-                    }
-                    fillActive -> {
-                        // Bucket: flood-fill the active cel at the tap; don't draw.
-                        mode = Mode.IDLE
-                        floodFillAtView(event.getX(0), event.getY(0))
-                    }
-                    sculptActive -> {
-                        val canvasPos = toCanvas(event.getX(0), event.getY(0))
-                        val caught = sculptListener?.onNodeBegin(canvasPos) ?: false
-                        if (caught) {
-                            mode = Mode.SCULPT
-                        } else if (ctrlActive) {
-                            // CTRL + Tap in Sculpt Mode starts Lasso
-                            mode = Mode.LASSO
-                            sculptListener?.onLassoBegin(canvasPos)
-                        } else {
-                            mode = Mode.IDLE
-                        }
-                    }
-                    else -> {
-                        mode = Mode.DRAW
-                        strokeStartTime = event.eventTime
-                        val s = sample(0)
-                        strokeOrigin = s.pos
-                        currentStrokePoints.clear()
-                        currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, 0L))
-                        renderer.post(
-                            CanvasRenderer.EngineEvent.Begin(
-                                cfg.targetSurfaceId, cfg.brush, cfg.color, s,
-                                symmetryCount = if (symmetryEnabled) symmetryCount else 0
-                            )
-                        )
-                        requestRender()
-                    }
+                if (sculptActive) {
+                    if (sculptListener?.onNodeBegin(canvasPos) == true) mode = Mode.SCULPT
+                    else if (ctrlActive) { mode = Mode.LASSO; sculptListener?.onLassoBegin(canvasPos) }
+                } else {
+                    mode = Mode.DRAW
+                    strokeStartTime = event.eventTime
+                    strokeOrigin = canvasPos
+                    currentStrokePoints.clear()
+                    val s = sample(0)
+                    currentStrokePoints.add(StrokePoint(s.pos, s.pressure, 0L))
+                    renderer.post(CanvasRenderer.EngineEvent.Begin(cfg.targetSurfaceId, cfg.brush, cfg.color, s, if (symmetryEnabled) symmetryCount else 0))
                 }
             }
-
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                // A second finger arrived: abandon any wet stroke and start navigating.
-                if (mode == Mode.DRAW) {
-                    renderer.post(CanvasRenderer.EngineEvent.End)
-                }
-                if (event.pointerCount >= 2) beginNavigation(event)
-            }
-
             MotionEvent.ACTION_MOVE -> {
                 val canvasPos = toCanvas(event.getX(0), event.getY(0))
                 sculptListener?.onCursorMove(canvasPos)
-                
-                // Node Insight: Reveal nodes as cursor passes over them
-                if (sculptActive) {
-                    // callback through listener
-                }
-
                 when (mode) {
                     Mode.DRAW -> {
                         for (h in 0 until event.historySize) {
                             val s = sample(0, h)
-                            // Precision Optimization: Only record if the point has moved significantly (0.5px)
-                            // This prevents "Node Pooling" when the artist dwells in one spot.
-                            val lastPos = currentStrokePoints.lastOrNull()?.pos
-                            if (currentStrokePoints.size < 800 && (lastPos == null || s.pos.distanceTo(lastPos) > 0.5f)) {
-                                currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
-                            }
+                            if (currentStrokePoints.size < 800) currentStrokePoints.add(StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
                             renderer.post(CanvasRenderer.EngineEvent.Extend(s))
                         }
                         val s = sample(0)
-                        val lastPos = currentStrokePoints.lastOrNull()?.pos
-                        if (currentStrokePoints.size < 800 && (lastPos == null || s.pos.distanceTo(lastPos) > 0.5f)) {
-                            currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
-                        }
+                        if (currentStrokePoints.size < 800) currentStrokePoints.add(StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
                         renderer.post(CanvasRenderer.EngineEvent.Extend(s))
-                        requestRender()
                     }
-                    Mode.NAVIGATE -> {
-                        updateNavigation(event)
-                        requestRender()
-                    }
-                    Mode.SCULPT -> {
-                        sculptListener?.onNodeMove(canvasPos)
-                        requestRender()
-                    }
-                    Mode.LASSO -> {
-                        sculptListener?.onLassoMove(canvasPos)
-                        requestRender()
-                    }
-                    Mode.IDLE -> {
-                        requestRender() // Render cursor move even if idle
-                    }
+                    Mode.SCULPT -> sculptListener?.onNodeMove(canvasPos)
+                    Mode.LASSO -> sculptListener?.onLassoMove(canvasPos)
+                    Mode.NAVIGATE -> updateNavigation(event)
+                    else -> {}
                 }
+                requestRender()
             }
-
-            MotionEvent.ACTION_POINTER_UP -> {
-                // Dropped to one finger: stay in navigation but rebind pointers, or idle.
-                if (event.pointerCount <= 2) {
-                    mode = Mode.IDLE
-                    navIdA = -1; navIdB = -1
-                }
-            }
-
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (mode == Mode.DRAW) {
                     renderer.post(CanvasRenderer.EngineEvent.End)
-                    val data = com.inkframe.core.model.StrokeData(
-                        brushId = cfg.brush.id,
-                        color = cfg.color,
-                        points = ArrayList(currentStrokePoints)
-                    )
-                    post { onStrokeFinished?.invoke(data) }
-                } else if (mode == Mode.SCULPT) {
-                    sculptListener?.onNodeEnd()
-                } else if (mode == Mode.LASSO) {
-                    sculptListener?.onLassoEnd()
-                }
+                    onStrokeFinished?.invoke(StrokeData(cfg.brush.id, cfg.color, ArrayList(currentStrokePoints)))
+                } else if (mode == Mode.SCULPT) sculptListener?.onNodeEnd()
+                else if (mode == Mode.LASSO) sculptListener?.onLassoEnd()
                 mode = Mode.IDLE
-                navIdA = -1; navIdB = -1
                 requestRender()
             }
-
-            else -> return false
+            MotionEvent.ACTION_POINTER_DOWN -> if (event.pointerCount >= 2) beginNavigation(event)
+            else -> {}
         }
         return true
     }
 
     private fun beginNavigation(event: MotionEvent) {
         mode = Mode.NAVIGATE
-        navIdA = event.getPointerId(0)
-        navIdB = event.getPointerId(1)
+        navIdA = event.getPointerId(0); navIdB = event.getPointerId(1)
         prevAx = event.getX(0); prevAy = event.getY(0)
         prevBx = event.getX(1); prevBy = event.getY(1)
     }
 
     private fun updateNavigation(event: MotionEvent) {
-        val ia = event.findPointerIndex(navIdA)
-        val ib = event.findPointerIndex(navIdB)
+        val ia = event.findPointerIndex(navIdA); val ib = event.findPointerIndex(navIdB)
         if (ia < 0 || ib < 0) return
         val curAx = event.getX(ia); val curAy = event.getY(ia)
         val curBx = event.getX(ib); val curBy = event.getY(ib)
-
-        var next = viewport.applyGesture(
-            Vec2(prevAx, prevAy), Vec2(prevBx, prevBy),
-            Vec2(curAx, curAy), Vec2(curBx, curBy),
-        )
-        // Clamp zoom about the gesture midpoint so it doesn't run away.
-        val pivotX = (curAx + curBx) * 0.5f
-        val pivotY = (curAy + curBy) * 0.5f
-        next = next.withScaleClamped(minScale, maxScale, pivotX, pivotY)
-        viewport = next
-
-        prevAx = curAx; prevAy = curAy
-        prevBx = curBx; prevBy = curBy
+        renderer.viewport = renderer.viewport.applyGesture(Vec2(prevAx, prevAy), Vec2(prevBx, prevBy), Vec2(curAx, curAy), Vec2(curBx, curBy))
+        prevAx = curAx; prevAy = curAy; prevBx = curBx; prevBy = curBy
     }
+    
+    fun undo() { renderer.post(CanvasRenderer.EngineEvent.Undo); requestRender() }
+    fun redo() { renderer.post(CanvasRenderer.EngineEvent.Redo); requestRender() }
+    fun fitToScreen() { renderer.viewport = ViewportTransform.fit(canvasW, canvasH, width.toFloat(), height.toFloat()); requestRender() }
+    fun resetZoom() { renderer.viewport = ViewportTransform.IDENTITY; requestRender() }
+    fun setShowChecker(show: Boolean) { renderer.showChecker = show; requestRender() }
+    fun runOnEngine(block: (PaintEngine) -> Unit) { renderer.post(CanvasRenderer.EngineEvent.Run(block)); requestRender() }
+    
+    private val canvasW get() = renderer.canvasWidth.toFloat()
+    private val canvasH get() = renderer.canvasHeight.toFloat()
 }
