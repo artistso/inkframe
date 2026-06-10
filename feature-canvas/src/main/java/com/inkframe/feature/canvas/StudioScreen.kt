@@ -368,13 +368,13 @@ fun StudioScreen(state: StudioState = viewModel()) {
                     canvasView?.setShowChecker(state.showChecker)
                 },
             )
-                if (state.showVfxHud) {
-                    VfxHud(state)
-                }
             Box(Modifier.weight(1f)) {
                 AndroidView(
                     factory = { ctx ->
                         CanvasView(
+                if (state.showVfxHud) {
+                    VfxHud(state)
+                }
                             context = ctx,
                             canvasWidth = state.project.canvas.widthPx,
                             canvasHeight = state.project.canvas.heightPx,
