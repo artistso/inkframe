@@ -369,12 +369,10 @@ fun StudioScreen(state: StudioState = viewModel()) {
                 },
             )
             Box(Modifier.weight(1f)) {
+                if (state.showVfxHud) { VfxHud(state) }
                 AndroidView(
                     factory = { ctx ->
                         CanvasView(
-                if (state.showVfxHud) {
-                    VfxHud(state)
-                }
                             context = ctx,
                             canvasWidth = state.project.canvas.widthPx,
                             canvasHeight = state.project.canvas.heightPx,
@@ -1819,4 +1817,3 @@ private fun FrameStripForLayer(
     }
 }
 
-private fun percent(v: Float) = "${(v * 100).toInt()}%"

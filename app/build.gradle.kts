@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.play.publisher)
+    // alias(libs.plugins.play.publisher)
 }
 
 // --- Versioning ------------------------------------------------------------
@@ -70,12 +70,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Use the real release key when configured; otherwise fall back to debug so
-            // the build still produces an installable (debug-signed) artifact.
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            // Use the real release key when configured; otherwise don't set a signingConfig
+            // so it falls back to the default (which is unsigned/debug in some environments)
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }
