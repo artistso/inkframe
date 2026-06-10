@@ -14,6 +14,10 @@ uniform vec2 uCanvasSize;   // canvas size in pixels
 uniform vec4 uInv;          // inverse affine: (iax, iay, ibx, iby)
 uniform int uShowChecker;
 
+// Cursor Uniforms
+uniform vec2 uCursorPos; // Canvas space
+uniform bool uCursorActive;
+
 // KJG & Proko Uniforms
 uniform int uPerspectiveEnabled;
 uniform float uFisheyeStrength; // 0.0 to 1.0
@@ -87,6 +91,20 @@ void main() {
         float gridAlpha = (1.0 - smoothstep(0.0, 1.2, line)) * 0.2;
         
         outRgb = mix(outRgb, vec3(0.0, 0.9, 1.0), gridAlpha);
+    }
+
+    // Precision Cursor Rendering (Glass Donut)
+    if (uCursorActive) {
+        float dCursor = length(cp - uCursorPos);
+        float ring = abs(dCursor - 30.0); // 30px radius ring
+        float innerGlow = exp(-dCursor * 0.1);
+        
+        float ringMask = 1.0 - smoothstep(0.0, 2.0, ring);
+        float dotMask = 1.0 - smoothstep(0.0, 3.0, dCursor);
+        
+        outRgb = mix(outRgb, vec3(1.0), ringMask * 0.8);
+        outRgb = mix(outRgb, vec3(0.0, 0.9, 1.0), dotMask);
+        outRgb += innerGlow * vec3(0.0, 0.2, 0.3) * 0.4;
     }
 
     fragColor = vec4(outRgb, 1.0);

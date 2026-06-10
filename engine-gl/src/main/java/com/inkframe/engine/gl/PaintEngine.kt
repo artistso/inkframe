@@ -325,8 +325,10 @@ class PaintEngine(
         perspective: Boolean = false,
         fisheye: Float = 0f,
         lassoPoints: List<Vec2> = emptyList(),
-        selectedNodes: List<Pair<Int, Int>> = emptyList()
+        selectedNodes: List<Pair<Int, Int>> = emptyList(),
+        cursorPos: Vec2? = null
     ) {
+        // ... (existing preview logic)
         // ... (existing preview logic)
         // ... (existing preview logic)
         // ... (existing preview logic)
@@ -388,7 +390,7 @@ class PaintEngine(
             )
         }
 
-        compositor.present(flat, screenW, screenH, showChecker, invCoeffs, perspective, fisheye)
+        compositor.present(flat, screenW, screenH, showChecker, invCoeffs, perspective, fisheye, cursorPos)
     }
 
     /**

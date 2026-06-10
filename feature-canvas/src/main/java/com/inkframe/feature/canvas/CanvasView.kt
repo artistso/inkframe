@@ -38,6 +38,7 @@ class CanvasView(
     private val perspectiveProvider: () -> CanvasRenderer.PerspectiveConfig = { CanvasRenderer.PerspectiveConfig() },
     private val lassoProvider: () -> List<Vec2> = { emptyList() },
     private val selectionProvider: () -> List<Pair<Int, Int>> = { emptyList() },
+    private val cursorProvider: () -> Vec2? = { null },
     private val strokeConfig: () -> StrokeConfig,
     private val onEngineReady: (PaintEngine) -> Unit,
 ) : GLSurfaceView(context) {
@@ -88,6 +89,7 @@ class CanvasView(
             perspectiveProvider = perspectiveProvider,
             lassoProvider = lassoProvider,
             selectionProvider = selectionProvider,
+            cursorProvider = cursorProvider,
             onEngineReady = onEngineReady,
             backupStore = backupStore,
             onContextRestored = { post { onContextRestored?.invoke() } },
@@ -425,6 +427,9 @@ class CanvasView(
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                val canvasPos = toCanvas(event.getX(0), event.getY(0))
+                state.cursorPosition = canvasPos
+                
                 when {
                     eyedropperActive -> {
                         // Eyedropper: sample the colour under the finger; don't draw.
@@ -475,33 +480,43 @@ class CanvasView(
                 if (event.pointerCount >= 2) beginNavigation(event)
             }
 
-            MotionEvent.ACTION_MOVE -> when (mode) {
-                Mode.DRAW -> {
-                    for (h in 0 until event.historySize) {
-                        val s = sample(0, h)
+            MotionEvent.ACTION_MOVE -> {
+                val canvasPos = toCanvas(event.getX(0), event.getY(0))
+                state.cursorPosition = canvasPos
+                
+                // Node Insight: Reveal nodes as cursor passes over them
+                if (state.sculptMode) {
+                    state.hoveredNode = state.findNodeAt(canvasPos, 30f / viewport.scale)
+                }
+
+                when (mode) {
+                    Mode.DRAW -> {
+                        for (h in 0 until event.historySize) {
+                            val s = sample(0, h)
+                            currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
+                            renderer.post(CanvasRenderer.EngineEvent.Extend(s))
+                        }
+                        val s = sample(0)
                         currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
                         renderer.post(CanvasRenderer.EngineEvent.Extend(s))
+                        requestRender()
                     }
-                    val s = sample(0)
-                    currentStrokePoints.add(com.inkframe.core.model.StrokePoint(s.pos, s.pressure, s.timeMs - strokeStartTime))
-                    renderer.post(CanvasRenderer.EngineEvent.Extend(s))
-                    requestRender()
+                    Mode.NAVIGATE -> {
+                        updateNavigation(event)
+                        requestRender()
+                    }
+                    Mode.SCULPT -> {
+                        sculptListener?.onNodeMove(canvasPos)
+                        requestRender()
+                    }
+                    Mode.LASSO -> {
+                        sculptListener?.onLassoMove(canvasPos)
+                        requestRender()
+                    }
+                    Mode.IDLE -> {
+                        requestRender() // Render cursor move even if idle
+                    }
                 }
-                Mode.NAVIGATE -> {
-                    updateNavigation(event)
-                    requestRender()
-                }
-                Mode.SCULPT -> {
-                    val canvasPos = toCanvas(event.getX(0), event.getY(0))
-                    sculptListener?.onNodeMove(canvasPos)
-                    requestRender()
-                }
-                Mode.LASSO -> {
-                    val canvasPos = toCanvas(event.getX(0), event.getY(0))
-                    sculptListener?.onLassoMove(canvasPos)
-                    requestRender()
-                }
-                Mode.IDLE -> {}
             }
 
             MotionEvent.ACTION_POINTER_UP -> {
@@ -527,6 +542,8 @@ class CanvasView(
                     sculptListener?.onLassoEnd()
                 }
                 mode = Mode.IDLE
+                state.activeSculptNode = null
+                state.cursorPosition = null
                 navIdA = -1; navIdB = -1
                 requestRender()
             }

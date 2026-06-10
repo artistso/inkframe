@@ -34,6 +34,8 @@ class Compositor(context: Context, private val width: Int, private val height: I
     private val pChecker = GLES30.glGetUniformLocation(presentProgram, "uShowChecker")
     private val pPersp = GLES30.glGetUniformLocation(presentProgram, "uPerspectiveEnabled")
     private val pFish = GLES30.glGetUniformLocation(presentProgram, "uFisheyeStrength")
+    private val pCursorPos = GLES30.glGetUniformLocation(presentProgram, "uCursorPos")
+    private val pCursorActive = GLES30.glGetUniformLocation(presentProgram, "uCursorActive")
 
     // Fullscreen quad: pos.xy, uv.xy
     private val quad = floatBuffer(
@@ -117,7 +119,8 @@ class Compositor(context: Context, private val width: Int, private val height: I
         showChecker: Boolean,
         invCoeffs: FloatArray,
         perspective: Boolean = false,
-        fisheye: Float = 0f
+        fisheye: Float = 0f,
+        cursorPos: com.inkframe.core.common.Vec2? = null
     ) {
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
         GLES30.glViewport(0, 0, screenW, screenH)
@@ -133,6 +136,13 @@ class Compositor(context: Context, private val width: Int, private val height: I
         GLES30.glUniform1i(pChecker, if (showChecker) 1 else 0)
         GLES30.glUniform1i(pPersp, if (perspective) 1 else 0)
         GLES30.glUniform1f(pFish, fisheye)
+        
+        if (cursorPos != null) {
+            GLES30.glUniform2f(pCursorPos, cursorPos.x, cursorPos.y)
+            GLES30.glUniform1i(pCursorActive, 1)
+        } else {
+            GLES30.glUniform1i(pCursorActive, 0)
+        }
 
         drawQuad(presentProgram)
     }

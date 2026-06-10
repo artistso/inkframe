@@ -28,6 +28,7 @@ class CanvasRenderer(
     private val perspectiveProvider: () -> PerspectiveConfig = { PerspectiveConfig() },
     private val lassoProvider: () -> List<Vec2> = { emptyList() },
     private val selectionProvider: () -> List<Pair<Int, Int>> = { emptyList() },
+    private val cursorProvider: () -> com.inkframe.core.common.Vec2? = { null },
     private val onEngineReady: (PaintEngine) -> Unit,
     /** Survives GL-context loss; used to re-upload artwork when the context is recreated. */
     private val backupStore: SurfaceBackupStore,
@@ -108,7 +109,8 @@ class CanvasRenderer(
         val p = perspectiveProvider()
         e.composeAndPresent(
             sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs(), 
-            sculptProvider(), p.enabled, p.fisheye, lassoProvider(), selectionProvider()
+            sculptProvider(), p.enabled, p.fisheye, lassoProvider(), selectionProvider(),
+            cursorProvider()
         )
     }
 

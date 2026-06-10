@@ -58,6 +58,11 @@ class StudioState : ViewModel() {
     var lassoPath = mutableStateListOf<Vec2>()
     var selectedNodes = mutableStateListOf<Pair<Int, Int>>() // (StrokeIdx, PointIdx)
     
+    /** The current logical position of the "Precision Cursor" in canvas space. */
+    var cursorPosition by mutableStateOf<Vec2?>(null)
+    /** The node currently hovered by the cursor. */
+    var hoveredNode by mutableStateOf<Pair<Int, Int>?>(null)
+
     /** The node currently being dragged in Sculpt Mode: (StrokeIndex, PointIndex) */
     var activeSculptNode by mutableStateOf<Pair<Int, Int>?>(null)
     /** Whether the bucket/fill tool is armed (next canvas tap flood-fills). */
@@ -558,6 +563,36 @@ class StudioState : ViewModel() {
         val layer = activeLayer
         val cel = layer.cels[currentFrame] ?: return
         
+        var targetPos = newPos
+
+        // Perspective Grid Snapping
+        if (perspectiveEnabled) {
+            val uv = Vec2(targetPos.x / project.canvas.widthPx, targetPos.y / project.canvas.heightPx)
+            val normC = uv * 2f - Vec2(1f, 1f)
+            val d = normC.length()
+            val gridC = normC * (1f + perspectiveFisheye * d * d)
+            
+            // Snap gridC to nearest 0.2 increment (matches 5x5 grid)
+            val snappedGridC = Vec2(
+                Math.round(gridC.x * 5f) / 5f,
+                Math.round(gridC.y * 5f) / 5f
+            )
+            
+            // Inverse the fisheye (approximation)
+            val sd = snappedGridC.length()
+            val invFisheye = 1f / (1f + perspectiveFisheye * sd * sd)
+            val snappedNormC = snappedGridC * invFisheye
+            
+            val snappedUv = (snappedNormC + Vec2(1f, 1f)) * 0.5f
+            val snappedPos = Vec2(snappedUv.x * project.canvas.widthPx, snappedUv.y * project.canvas.heightPx)
+            
+            // Only snap if very close to a grid intersection
+            if (targetPos.distanceTo(snappedPos) < 15f / (zoomPercent / 100f)) {
+                targetPos = snappedPos
+                statusMessage = "Snapped to Perspective"
+            }
+        }
+
         val strokes = cel.vectorData.strokes.toMutableList()
         val points = strokes[si].points.toMutableList()
         val delta = newPos - points[pi].pos

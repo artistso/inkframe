@@ -385,6 +385,7 @@ fun StudioScreen(state: StudioState = viewModel()) {
                             },
                             lassoProvider = { state.lassoPath },
                             selectionProvider = { state.selectedNodes },
+                            cursorProvider = { state.cursorPosition },
                             strokeConfig = {
                                 val sid = state.ensureActiveCel()
                                 CanvasView.StrokeConfig(
