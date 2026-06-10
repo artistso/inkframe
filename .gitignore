@@ -2,5 +2,7 @@ node_modules/
 dist/
 *.log
 .gradle/
-*.jar
 build/
+# Allow the gradle wrapper jar but ignore other jars
+!gradle/wrapper/gradle-wrapper.jar
+*.jar
