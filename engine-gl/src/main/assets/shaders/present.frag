@@ -27,6 +27,18 @@ vec3 checker(vec2 screenPx) {
     return mix(vec3(0.08), vec3(0.12), m);
 }
 
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i + vec2(0,0)), hash(i + vec2(1,0)), f.x),
+               mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+}
+
 void main() {
     // Screen pixel in top-left origin (gl_FragCoord is bottom-left origin).
     vec2 vp = vec2(gl_FragCoord.x, uScreenSize.y - gl_FragCoord.y);
@@ -48,6 +60,10 @@ void main() {
 
     vec4 col = texture(uCanvas, uv);
     vec3 outRgb = mix(bg, col.rgb, col.a);
+    
+    // Fractal Paper Grain
+    float grain = noise(uv * 500.0) * 0.05 + noise(uv * 1000.0) * 0.02;
+    outRgb += grain * (1.0 - col.a); // Only apply to background/transparent areas
     
     // KJG Perspective Grid Overlay (Fish-eye)
     if (uPerspectiveEnabled == 1) {

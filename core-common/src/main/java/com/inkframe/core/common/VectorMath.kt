@@ -35,6 +35,27 @@ object VectorMath {
         }
     }
 
+    /**
+     * Attempts to merge two paths if their endpoints are near.
+     */
+    fun tryMerge(pathA: List<Vec2>, pathB: List<Vec2>, threshold: Float): List<Vec2>? {
+        if (pathA.isEmpty() || pathB.isEmpty()) return null
+        
+        val aStart = pathA.first()
+        val aEnd = pathA.last()
+        val bStart = pathB.first()
+        val bEnd = pathB.last()
+
+        // 4 possible connection cases
+        return when {
+            aEnd.distanceTo(bStart) < threshold -> pathA + pathB.drop(1)
+            aEnd.distanceTo(bEnd) < threshold -> pathA + pathB.reversed().drop(1)
+            aStart.distanceTo(bStart) < threshold -> pathA.reversed() + pathB.drop(1)
+            aStart.distanceTo(bEnd) < threshold -> bStart.let { pathB + pathA.drop(1) }
+            else -> null
+        }
+    }
+
     private fun distPointToLine(p: Vec2, a: Vec2, b: Vec2): Float {
         val dx = b.x - a.x
         val dy = b.y - a.y

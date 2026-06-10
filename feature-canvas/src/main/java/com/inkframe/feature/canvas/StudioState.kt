@@ -422,52 +422,92 @@ class StudioState : ViewModel() {
     fun recordStroke(data: com.inkframe.core.model.StrokeData) {
         val layer = activeLayer
         val cel = layer.cels[currentFrame] ?: return
-        val existingPaths = cel.vectorData.strokes.map { it.points.map { p -> p.pos } }
+        val existingStrokes = cel.vectorData.strokes
+        val existingPaths = existingStrokes.map { it.points.map { p -> p.pos } }
 
         var processedPoints = data.points
 
-        // 1. Vector Magnet (CSP style snapping)
-        if (brush.vectorMagnet > 0f && existingPaths.isNotEmpty()) {
-            val threshold = brush.vectorMagnet * 50f // 0..50px snap range
-            val startSnap = VectorMath.findSnapPoint(processedPoints.first().pos, existingPaths, threshold)
-            val endSnap = VectorMath.findSnapPoint(processedPoints.last().pos, existingPaths, threshold)
+        // 1. Vector Magnet & Merging (CSP style)
+        var merged = false
+        val finalData = if (brush.vectorMagnet > 0f) {
+            val threshold = brush.vectorMagnet * 50f
+            var resultData = data
             
-            val newPoints = processedPoints.toMutableList()
-            if (startSnap != null) newPoints[0] = newPoints[0].copy(pos = startSnap)
-            if (endSnap != null) newPoints[newPoints.lastIndex] = newPoints.lastIndex.let { newPoints[it].copy(pos = endSnap) }
-            processedPoints = newPoints
+            // Try to merge with an existing stroke of the same brush/color
+            val mergeIdx = existingStrokes.indexOfFirst { 
+                it.brushId == data.brushId && it.color == data.color 
+            }
+            
+            if (mergeIdx != -1) {
+                val pathA = existingStrokes[mergeIdx].points.map { it.pos }
+                val pathB = processedPoints.map { it.pos }
+                val mergedPath = VectorMath.tryMerge(pathA, pathB, threshold)
+                
+                if (mergedPath != null) {
+                    val mergedPoints = mergedPath.map { pos ->
+                        // Re-use pressure from original points where possible
+                        (existingStrokes[mergeIdx].points + processedPoints)
+                            .minByOrNull { it.pos.distanceTo(pos) }?.copy(pos = pos)
+                            ?: com.inkframe.core.model.StrokePoint(pos, 0.5f, 0L)
+                    }
+                    val newStrokes = existingStrokes.toMutableList()
+                    newStrokes[mergeIdx] = existingStrokes[mergeIdx].copy(points = mergedPoints)
+                    merged = true
+                    statusMessage = "Vector Paths Merged"
+                    data.copy(points = mergedPoints) // Internal return
+                    val newVector = cel.vectorData.copy(strokes = newStrokes)
+                    updateLayer(layer.id) { l ->
+                        l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))
+                    }
+                }
+            }
+            
+            if (!merged) {
+                // If no merge, just snap start/end
+                val startSnap = VectorMath.findSnapPoint(processedPoints.first().pos, existingPaths, threshold)
+                val endSnap = VectorMath.findSnapPoint(processedPoints.last().pos, existingPaths, threshold)
+                
+                val newPoints = processedPoints.toMutableList()
+                if (startSnap != null) newPoints[0] = newPoints[0].copy(pos = startSnap)
+                if (endSnap != null) newPoints[newPoints.lastIndex] = newPoints.lastIndex.let { newPoints[it].copy(pos = endSnap) }
+                processedPoints = newPoints
+                data.copy(points = processedPoints)
+            } else {
+                null // Already updated in the merge block
+            }
+        } else {
+            data.copy(points = processedPoints)
         }
 
-        // 2. Post-Correction (CSP style simplification)
-        if (brush.postCorrection > 0f) {
-            val epsilon = brush.postCorrection * 5f // 0..5px deviation
-            val simplifiedPos = VectorMath.simplify(processedPoints.map { it.pos }, epsilon)
-            // Reconstruct points (interpolation for pressure/time would be better, but this is a start)
-            processedPoints = simplifiedPos.map { pos ->
-                // Find original point closest to this simplified pos to keep its pressure
-                processedPoints.minByOrNull { it.pos.distanceTo(pos) }?.copy(pos = pos) 
-                    ?: com.inkframe.core.model.StrokePoint(pos, 0.5f, 0L)
+        // 2. Post-Correction & Smart Shaping (Only if not already merged/updated)
+        if (finalData != null) {
+            var activePoints = finalData.points
+            
+            if (brush.postCorrection > 0f) {
+                val epsilon = brush.postCorrection * 5f
+                val simplifiedPos = VectorMath.simplify(activePoints.map { it.pos }, epsilon)
+                activePoints = simplifiedPos.map { pos ->
+                    activePoints.minByOrNull { it.pos.distanceTo(pos) }?.copy(pos = pos)
+                        ?: com.inkframe.core.model.StrokePoint(pos, 0.5f, 0L)
+                }
+            }
+
+            val finalProcessed = if (brush.smartShaping) {
+                val shape = ShapeDetector.detect(activePoints.map { it.pos })
+                if (shape.type != ShapeDetector.ShapeType.NONE) {
+                    statusMessage = "Smart Shaped: ${shape.type.name}"
+                    finalData.copy(points = shape.points.map { 
+                        com.inkframe.core.model.StrokePoint(it, 0.5f, 0L) 
+                    })
+                } else finalData.copy(points = activePoints)
+            } else finalData.copy(points = activePoints)
+
+            val newVector = cel.vectorData.copy(strokes = cel.vectorData.strokes + finalProcessed)
+            updateLayer(layer.id) { l ->
+                l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))
             }
         }
-
-        // 3. Smart Shaping
-        val finalData = if (brush.smartShaping) {
-            val shape = ShapeDetector.detect(processedPoints.map { it.pos })
-            if (shape.type != ShapeDetector.ShapeType.NONE) {
-                statusMessage = "Smart Shaped: ${shape.type.name}"
-                data.copy(points = shape.points.map { 
-                    com.inkframe.core.model.StrokePoint(it, 0.5f, 0L) 
-                })
-            } else data.copy(points = processedPoints)
-        } else data.copy(points = processedPoints)
-
-        // 4. Add to vector data
-        val newVector = cel.vectorData.copy(strokes = cel.vectorData.strokes + finalData)
-        updateLayer(layer.id) { l ->
-            l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))
-        }
         
-        // 5. Re-render
         onUiInvalidate?.invoke()
     }
 

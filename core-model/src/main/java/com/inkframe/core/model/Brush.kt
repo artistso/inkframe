@@ -84,5 +84,11 @@ object DefaultBrushes {
         smoothing = 0.6f, stabilization = 0.4f
     )
 
-    val all = listOf(pencil, ink, round, airbrush, marker, eraser, neonGlow)
+    val kjgInk = Brush(
+        "kjg_ink", "KJG Master Ink", BrushKind.INK,
+        sizePx = 8f, minSizePx = 1f, hardness = 0.95f, spacing = 0.02f,
+        smoothing = 0.7f, stabilization = 0.5f, postCorrection = 0.3f, vectorMagnet = 0.4f
+    )
+
+    val all = listOf(pencil, ink, round, airbrush, marker, eraser, neonGlow, kjgInk)
 }
