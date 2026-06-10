@@ -383,6 +383,8 @@ fun StudioScreen(state: StudioState = viewModel()) {
                             perspectiveProvider = {
                                 CanvasRenderer.PerspectiveConfig(state.perspectiveEnabled, state.perspectiveFisheye)
                             },
+                            lassoProvider = { state.lassoPath },
+                            selectionProvider = { state.selectedNodes },
                             strokeConfig = {
                                 val sid = state.ensureActiveCel()
                                 CanvasView.StrokeConfig(
@@ -410,6 +412,16 @@ fun StudioScreen(state: StudioState = viewModel()) {
                                 }
                                 override fun onNodeEnd() {
                                     state.activeSculptNode = null
+                                }
+                                override fun onLassoBegin(pos: Vec2) {
+                                    state.lassoPath.clear()
+                                    state.lassoPath.add(pos)
+                                }
+                                override fun onLassoMove(pos: Vec2) {
+                                    state.lassoPath.add(pos)
+                                }
+                                override fun onLassoEnd() {
+                                    state.selectNodesInLasso()
                                 }
                             }
                             // Engine history callbacks fire on the GL thread; bounce a
@@ -451,6 +463,9 @@ fun StudioScreen(state: StudioState = viewModel()) {
                         view.eyedropperActive = state.eyedropperActive
                         view.fillActive = state.fillActive
                         view.sculptActive = state.sculptMode
+                        view.ctrlActive = state.ctrlPressed
+                        view.shiftActive = state.shiftPressed
+                        view.altActive = state.altPressed
                         view.setShowChecker(state.showChecker)
                     }
                 )

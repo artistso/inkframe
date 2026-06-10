@@ -26,6 +26,8 @@ class CanvasRenderer(
     private val sceneProvider: () -> List<PaintEngine.LayerDrawSpec>,
     private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData> = { emptyList() },
     private val perspectiveProvider: () -> PerspectiveConfig = { PerspectiveConfig() },
+    private val lassoProvider: () -> List<Vec2> = { emptyList() },
+    private val selectionProvider: () -> List<Pair<Int, Int>> = { emptyList() },
     private val onEngineReady: (PaintEngine) -> Unit,
     /** Survives GL-context loss; used to re-upload artwork when the context is recreated. */
     private val backupStore: SurfaceBackupStore,
@@ -60,6 +62,7 @@ class CanvasRenderer(
         data object Undo : EngineEvent
         data object Redo : EngineEvent
         data class Run(val block: (PaintEngine) -> Unit) : EngineEvent
+        data class Push(val command: com.inkframe.core.common.Command) : EngineEvent
     }
 
     fun post(event: EngineEvent) { events.add(event) }
@@ -103,7 +106,10 @@ class CanvasRenderer(
         GLES30.glClearColor(0.5f, 0.5f, 0.5f, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         val p = perspectiveProvider()
-        e.composeAndPresent(sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs(), sculptProvider(), p.enabled, p.fisheye)
+        e.composeAndPresent(
+            sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs(), 
+            sculptProvider(), p.enabled, p.fisheye, lassoProvider(), selectionProvider()
+        )
     }
 
     private fun drainEvents(e: PaintEngine) {
@@ -116,6 +122,7 @@ class CanvasRenderer(
                 EngineEvent.Undo -> e.undo()
                 EngineEvent.Redo -> e.redo()
                 is EngineEvent.Run -> ev.block(e)
+                is EngineEvent.Push -> e.pushCommand(ev.command)
             }
         }
     }

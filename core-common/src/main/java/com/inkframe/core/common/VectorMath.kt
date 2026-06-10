@@ -56,6 +56,24 @@ object VectorMath {
         }
     }
 
+    /**
+     * Point-in-polygon test (Jordan Curve Theorem).
+     * Used for Lasso selection.
+     */
+    fun isPointInPolygon(p: Vec2, polygon: List<Vec2>): Boolean {
+        var inside = false
+        var j = polygon.size - 1
+        for (i in polygon.indices) {
+            if (((polygon[i].y > p.y) != (polygon[j].y > p.y)) &&
+                (p.x < (polygon[j].x - polygon[i].x) * (p.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)
+            ) {
+                inside = !inside
+            }
+            j = i
+        }
+        return inside
+    }
+
     private fun distPointToLine(p: Vec2, a: Vec2, b: Vec2): Float {
         val dx = b.x - a.x
         val dy = b.y - a.y

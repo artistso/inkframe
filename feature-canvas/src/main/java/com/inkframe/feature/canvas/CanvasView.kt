@@ -36,6 +36,8 @@ class CanvasView(
     private val sceneProvider: () -> List<PaintEngine.LayerDrawSpec>,
     private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData> = { emptyList() },
     private val perspectiveProvider: () -> CanvasRenderer.PerspectiveConfig = { CanvasRenderer.PerspectiveConfig() },
+    private val lassoProvider: () -> List<Vec2> = { emptyList() },
+    private val selectionProvider: () -> List<Pair<Int, Int>> = { emptyList() },
     private val strokeConfig: () -> StrokeConfig,
     private val onEngineReady: (PaintEngine) -> Unit,
 ) : GLSurfaceView(context) {
@@ -44,10 +46,16 @@ class CanvasView(
         fun onNodeBegin(pos: Vec2): Boolean
         fun onNodeMove(pos: Vec2)
         fun onNodeEnd()
+        fun onLassoBegin(pos: Vec2)
+        fun onLassoMove(pos: Vec2)
+        fun onLassoEnd()
     }
 
     var sculptListener: SculptListener? = null
     var sculptActive: Boolean = false
+    var ctrlActive: Boolean = false
+    var shiftActive: Boolean = false
+    var altActive: Boolean = false
 
     /** What to draw with right now and where (the active cel's surface). */
     data class StrokeConfig(
@@ -78,6 +86,8 @@ class CanvasView(
             sceneProvider = sceneProvider,
             sculptProvider = sculptProvider,
             perspectiveProvider = perspectiveProvider,
+            lassoProvider = lassoProvider,
+            selectionProvider = selectionProvider,
             onEngineReady = onEngineReady,
             backupStore = backupStore,
             onContextRestored = { post { onContextRestored?.invoke() } },
@@ -162,6 +172,11 @@ class CanvasView(
     fun undo() {
         renderer.post(CanvasRenderer.EngineEvent.Undo)
         requestRender()
+    }
+
+    /** Pushes a command to the engine's undo stack. */
+    fun pushCommand(command: com.inkframe.core.common.Command) {
+        renderer.post(CanvasRenderer.EngineEvent.Push(command))
     }
 
     /** Requests a redo on the GL thread. */
@@ -354,7 +369,7 @@ class CanvasView(
 
     // --- Input arbitration: 1 pointer draws, 2 pointers navigate ------------
 
-    private enum class Mode { IDLE, DRAW, NAVIGATE, SCULPT }
+    private enum class Mode { IDLE, DRAW, NAVIGATE, SCULPT, LASSO }
     private var mode = Mode.IDLE
     private val currentStrokePoints = ArrayList<com.inkframe.core.model.StrokePoint>()
     private var strokeStartTime = 0L
@@ -426,6 +441,10 @@ class CanvasView(
                         val caught = sculptListener?.onNodeBegin(canvasPos) ?: false
                         if (caught) {
                             mode = Mode.SCULPT
+                        } else if (ctrlActive) {
+                            // CTRL + Tap in Sculpt Mode starts Lasso
+                            mode = Mode.LASSO
+                            sculptListener?.onLassoBegin(canvasPos)
                         } else {
                             mode = Mode.IDLE
                         }
@@ -477,6 +496,11 @@ class CanvasView(
                     sculptListener?.onNodeMove(canvasPos)
                     requestRender()
                 }
+                Mode.LASSO -> {
+                    val canvasPos = toCanvas(event.getX(0), event.getY(0))
+                    sculptListener?.onLassoMove(canvasPos)
+                    requestRender()
+                }
                 Mode.IDLE -> {}
             }
 
@@ -499,6 +523,8 @@ class CanvasView(
                     post { onStrokeFinished?.invoke(data) }
                 } else if (mode == Mode.SCULPT) {
                     sculptListener?.onNodeEnd()
+                } else if (mode == Mode.LASSO) {
+                    sculptListener?.onLassoEnd()
                 }
                 mode = Mode.IDLE
                 navIdA = -1; navIdB = -1

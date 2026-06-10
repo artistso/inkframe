@@ -233,6 +233,15 @@ class PaintEngine(
 
     // ---- Undo / redo --------------------------------------------------------
 
+    /**
+     * Executes [command] immediately and records it for later undo.
+     * Use [pushAlreadyApplied] if the state is already modified.
+     */
+    fun pushCommand(command: com.inkframe.core.common.Command) {
+        undoStack.push(command)
+        onHistoryChanged?.invoke()
+    }
+
     fun undo(): Boolean {
         val ok = undoStack.undo()
         if (ok) onHistoryChanged?.invoke()
@@ -314,8 +323,11 @@ class PaintEngine(
         invCoeffs: FloatArray,
         sculptData: List<com.inkframe.core.model.StrokeData> = emptyList(),
         perspective: Boolean = false,
-        fisheye: Float = 0f
+        fisheye: Float = 0f,
+        lassoPoints: List<Vec2> = emptyList(),
+        selectedNodes: List<Pair<Int, Int>> = emptyList()
     ) {
+        // ... (existing preview logic)
         // ... (existing preview logic)
         // ... (existing preview logic)
         // If a stroke is wet, build a preview (cel + scratch) and substitute it for the
@@ -350,16 +362,30 @@ class PaintEngine(
         // Rendering Quantum Nodes if in sculpt mode
         if (sculptData.isNotEmpty()) {
             flat.bind()
-            for (stroke in sculptData) {
-                val dabs = stroke.points.map { p ->
-                    Dab(p.pos, 8f, 0f, 1f)
+            for (si in sculptData.indices) {
+                val stroke = sculptData[si]
+                for (pi in stroke.points.indices) {
+                    val p = stroke.points[pi]
+                    val isSelected = selectedNodes.contains(Pair(si, pi))
+                    val dabs = listOf(Dab(p.pos, if (isSelected) 12f else 8f, 0f, 1f))
+                    
+                    brushRenderer.stampToScratch(
+                        flat, DefaultBrushes.ink, 
+                        if (isSelected) com.inkframe.core.model.RgbaColor.CYAN else com.inkframe.core.model.RgbaColor.WHITE, 
+                        dabs, buildUp = false, glow = false, nodeMode = true
+                    )
                 }
-                // Stamp sharp white nodes
-                brushRenderer.stampToScratch(
-                    flat, DefaultBrushes.ink, com.inkframe.core.model.RgbaColor.WHITE, 
-                    dabs, buildUp = false, glow = false, nodeMode = true
-                )
             }
+        }
+        
+        // Render Lasso Path
+        if (lassoPoints.isNotEmpty()) {
+            flat.bind()
+            val dabs = lassoPoints.map { Dab(it, 4f, 0f, 0.5f) }
+            brushRenderer.stampToScratch(
+                flat, DefaultBrushes.ink, com.inkframe.core.model.RgbaColor.WHITE,
+                dabs, buildUp = false, glow = false, nodeMode = false
+            )
         }
 
         compositor.present(flat, screenW, screenH, showChecker, invCoeffs, perspective, fisheye)
