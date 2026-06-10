@@ -459,7 +459,6 @@ fun StudioScreen(state: StudioState = viewModel()) {
         }
 
         SidePanel(state = state, onChanged = { canvasView?.requestRender() })
-    }
 
     // Forward Activity lifecycle to the GL view so it can pause/resume rendering and back
     // up artwork before the EGL context may be destroyed.
@@ -478,7 +477,6 @@ fun StudioScreen(state: StudioState = viewModel()) {
             state.stop()
         }
     }
-}
 
 /**
  * A "Donut" styled icon button with a transparent center and thin ring.
