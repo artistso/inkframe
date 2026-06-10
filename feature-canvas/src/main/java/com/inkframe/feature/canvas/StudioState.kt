@@ -532,8 +532,19 @@ class StudioState : ViewModel() {
             } else finalData.copy(points = activePoints)
 
             val newVector = cel.vectorData.copy(strokes = cel.vectorData.strokes + finalProcessed)
+            
+            // Memory Optimization: Prevent vector "pooling" by simplifying heavy cels
+            val optimizedVector = if (newVector.strokes.sumOf { it.points.size } > 5000) {
+                newVector.copy(strokes = newVector.strokes.map { s ->
+                    val simplified = VectorMath.simplify(s.points.map { it.pos }, 1.0f)
+                    s.copy(points = simplified.map { pos ->
+                        s.points.minBy { it.pos.distanceTo(pos) }.copy(pos = pos)
+                    })
+                })
+            } else newVector
+
             updateLayer(layer.id) { l ->
-                l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))
+                l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = optimizedVector)))
             }
         }
         
