@@ -6,3 +6,4 @@ build/
 # Allow the gradle wrapper jar but ignore other jars
 !gradle/wrapper/gradle-wrapper.jar
 *.jar
+uploads/
