@@ -312,7 +312,9 @@ class PaintEngine(
         screenH: Int,
         showChecker: Boolean,
         invCoeffs: FloatArray,
+        sculptData: List<com.inkframe.core.model.StrokeData> = emptyList() // New: Render nodes
     ) {
+        // ... (existing preview logic)
         // If a stroke is wet, build a preview (cel + scratch) and substitute it for the
         // cel being drawn so the artist sees the in-progress stroke without modifying
         // the real cel yet.
@@ -341,6 +343,22 @@ class PaintEngine(
             )
         }
         val flat = compositor.flatten(draws)
+
+        // Rendering Quantum Nodes if in sculpt mode
+        if (sculptData.isNotEmpty()) {
+            flat.bind()
+            for (stroke in sculptData) {
+                val dabs = stroke.points.map { p ->
+                    Dab(p.pos, 8f, 0f, 1f)
+                }
+                // Stamp sharp white nodes
+                brushRenderer.stampToScratch(
+                    flat, DefaultBrushes.ink, com.inkframe.core.model.RgbaColor.WHITE, 
+                    dabs, buildUp = false, glow = false, nodeMode = true
+                )
+            }
+        }
+
         compositor.present(flat, screenW, screenH, showChecker, invCoeffs)
     }
 

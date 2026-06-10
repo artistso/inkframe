@@ -376,6 +376,11 @@ fun StudioScreen(state: StudioState = viewModel()) {
                             canvasWidth = state.project.canvas.widthPx,
                             canvasHeight = state.project.canvas.heightPx,
                             sceneProvider = { state.buildDrawList() },
+                            sculptProvider = {
+                                if (state.sculptMode) {
+                                    state.activeLayer.cels[state.currentFrame]?.vectorData?.strokes ?: emptyList()
+                                } else emptyList()
+                            },
                             strokeConfig = {
                                 val sid = state.ensureActiveCel()
                                 CanvasView.StrokeConfig(

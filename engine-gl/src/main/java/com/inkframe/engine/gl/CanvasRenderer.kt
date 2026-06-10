@@ -24,6 +24,7 @@ class CanvasRenderer(
     private val canvasWidth: Int,
     private val canvasHeight: Int,
     private val sceneProvider: () -> List<PaintEngine.LayerDrawSpec>,
+    private val sculptProvider: () -> List<com.inkframe.core.model.StrokeData> = { emptyList() },
     private val onEngineReady: (PaintEngine) -> Unit,
     /** Survives GL-context loss; used to re-upload artwork when the context is recreated. */
     private val backupStore: SurfaceBackupStore,
@@ -98,7 +99,7 @@ class CanvasRenderer(
         drainEvents(e)
         GLES30.glClearColor(0.5f, 0.5f, 0.5f, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        e.composeAndPresent(sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs())
+        e.composeAndPresent(sceneProvider(), screenW, screenH, showChecker, viewport.inverseCoeffs(), sculptProvider())
     }
 
     private fun drainEvents(e: PaintEngine) {
