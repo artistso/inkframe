@@ -296,6 +296,18 @@ class StudioState : ViewModel() {
 
     fun setLayerBlendMode(id: String, mode: BlendMode) = updateScene { LayerOps.setBlendMode(it, id, mode) }
 
+    fun swapLayers(fromId: String, toId: String) {
+        updateScene { sc ->
+            val fromIdx = sc.layers.indexOfFirst { it.id == fromId }
+            val toIdx = sc.layers.indexOfFirst { it.id == toId }
+            if (fromIdx == -1 || toIdx == -1) return@updateScene sc
+            val list = sc.layers.toMutableList()
+            val moved = list.removeAt(fromIdx)
+            list.add(toIdx, moved)
+            sc.copy(layers = list)
+        }
+    }
+
     fun duplicateLayer(id: String) {
         val nextId = UUID.randomUUID().toString()
         val originalLayer = scene.layerById(id) ?: return
@@ -548,55 +560,9 @@ class StudioState : ViewModel() {
         
         val strokes = cel.vectorData.strokes.toMutableList()
         val points = strokes[si].points.toMutableList()
-        val oldPos = points[pi].pos
-        val delta = newPos - oldPos
+        val delta = newPos - points[pi].pos
         
-        // Command for Quantum Undo
-        val command = object : com.inkframe.core.common.Command {
-            override val label = "Sculpt Node"
-            override fun apply() {
-                // Actually apply the move logic
-                if (shiftPressed) {
-                    for (i in points.indices) {
-                        val dist = Math.abs(i - pi).toFloat()
-                        val influence = Math.exp(-dist * dist / 32.0).toFloat()
-                        if (influence > 0.01f) {
-                            points[i] = points[i].copy(pos = points[i].pos + delta * influence)
-                        }
-                    }
-                } else {
-                    points[pi] = points[pi].copy(pos = newPos)
-                }
-                strokes[si] = strokes[si].copy(points = points)
-                val newVector = cel.vectorData.copy(strokes = strokes)
-                updateLayer(layer.id) { l -> l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector))) }
-            }
-            override fun revert() {
-                // Revert to old positions (simplified here, but works for the point)
-                if (shiftPressed) {
-                    for (i in points.indices) {
-                        val dist = Math.abs(i - pi).toFloat()
-                        val influence = Math.exp(-dist * dist / 32.0).toFloat()
-                        if (influence > 0.01f) {
-                            points[i] = points[i].copy(pos = points[i].pos - delta * influence)
-                        }
-                    }
-                } else {
-                    points[pi] = points[pi].copy(pos = oldPos)
-                }
-                strokes[si] = strokes[si].copy(points = points)
-                val oldVector = cel.vectorData.copy(strokes = strokes)
-                updateLayer(layer.id) { l -> l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = oldVector))) }
-            }
-        }
-        
-        // Record for Quantum Undo in the engine
-        postEngineWork?.invoke { engine -> 
-            // In a real impl, we'd only push the command when the drag ENDS
-            // To avoid flooding the undo stack.
-        }
-
-        // Apply live
+        // Apply live with Merging logic
         if (shiftPressed) {
             for (i in points.indices) {
                 val dist = Math.abs(i - pi).toFloat()
@@ -607,10 +573,19 @@ class StudioState : ViewModel() {
             }
         } else {
             points[pi] = points[pi].copy(pos = newPos)
+            
+            // Node Merging: snap to neighbors
+            if (pi > 0 && points[pi].pos.distanceTo(points[pi-1].pos) < 8f) {
+                points.removeAt(pi)
+                activeSculptNode = Pair(si, pi - 1)
+                statusMessage = "Quantum Nodes Merged"
+            } else if (pi < points.size - 1 && points[pi].pos.distanceTo(points[pi+1].pos) < 8f) {
+                points.removeAt(pi)
+                statusMessage = "Quantum Nodes Merged"
+            }
         }
         
         strokes[si] = strokes[si].copy(points = points)
-        
         val newVector = cel.vectorData.copy(strokes = strokes)
         updateLayer(layer.id) { l ->
             l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))

@@ -1299,7 +1299,20 @@ private fun FibonacciTimeline(
                                                     state.statusMessage = "Specter Duplicate created"
                                                 }
                                             },
-                                            onDrag = { _, _ -> /* Visual reordering logic to come */ }
+                                            onDrag = { change, dragAmount -> 
+                                                change.consume()
+                                                // Fibonacci Reordering: Detect if dragged over another layer
+                                                val yOffset = dragAmount.y
+                                                if (Math.abs(yOffset) > 20f) {
+                                                    val layers = state.scene.layers
+                                                    val currentIdx = layers.indexOfFirst { it.id == layer.id }
+                                                    val nextIdx = if (yOffset > 0) currentIdx - 1 else currentIdx + 1
+                                                    if (nextIdx in layers.indices) {
+                                                        state.swapLayers(layer.id, layers[nextIdx].id)
+                                                        onChanged()
+                                                    }
+                                                }
+                                            }
                                         )
                                     }
                                     .clickableNoRipple { state.activeLayerId = layer.id; onChanged() }

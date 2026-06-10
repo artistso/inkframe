@@ -506,7 +506,7 @@
   applyStream();
   // QuickShape: hold the pen still at the end of a stroke and it snaps to a clean line/ellipse.
   let qsEnabled=true, qsActive=false, qsShape=null, qsTimer=0, qsLastMove=0, qsAnchor={x:0,y:0};
-  const QS_HOLD=420;            // ms of stillness before a shape snaps
+  const QS_HOLD=280;            // ms of stillness before a shape snaps (Reduced from 420 for faster response)
   canvas.addEventListener('pointerdown',e=>{
     if(e.pointerType==='pen') penSeen=performance.now();
     if(drawing) return;                  // a stroke already owns the canvas — ignore extra contacts (palm)
