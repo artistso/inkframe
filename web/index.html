@@ -89,11 +89,11 @@
   .kids{ position:absolute; left:29px; top:29px; width:0; height:0; z-index:-1; }
   .kid{ position:absolute; left:0; top:0; width:44px; height:44px; margin:-22px 0 0 -22px; border-radius:50%;
     display:flex; align-items:center; justify-content:center; cursor:pointer;
-    transform:translate(0,0) scale(.35); opacity:0; pointer-events:none;
-    transition:transform .34s cubic-bezier(.2,.95,.25,1.1), opacity .24s ease;
+    transform:translate(0,0) scale(.35) rotate(-45deg); opacity:0; pointer-events:none;
+    transition:transform .45s cubic-bezier(.2,.95,.25,1.1), opacity .3s ease;
     background: radial-gradient(circle, rgba(255,255,255,0.02), transparent); border: 1px solid var(--rim); }
   .node.open > .kids > .kid, .branch.open > .kids > .kid{ opacity:1; pointer-events:auto;
-    transform:translate(var(--dx,0), var(--dy,0)) scale(1); }
+    transform:translate(var(--dx,0), var(--dy,0)) scale(1) rotate(var(--rot, 0deg)); }
   .kid::after{ content:""; position:absolute; inset:0; border-radius:50%; pointer-events:none;
     background:none; }
   .kid .glyph{ position:relative; z-index:1; font-size:16px; color:#fff; font-weight:600;
@@ -907,26 +907,27 @@
     const base=Math.atan2(cy-window.innerHeight/2, cx-window.innerWidth/2); // point outward from screen centre
 
     // kid diameter (largest in the set) drives required angular spacing → no overlap.
-    let kd=48; kids.forEach(k=>{ kd=Math.max(kd, k.getBoundingClientRect().width||48); });
-    const pad=14;                              // breathing room between circles
+    let kd=44; kids.forEach(k=>{ kd=Math.max(kd, k.getBoundingClientRect().width||44); });
+    const pad=12;                              // breathing room between circles
     const need=kd+pad;                         // chord length we must leave between neighbours
 
-    // Base radius on a Fibonacci-ish progression so denser sets bow out gracefully.
-    // R is chosen so the chord for the angular step >= need.
-    const spread=Math.min(Math.PI*1.15, 0.55*n + 0.6);   // total fan angle
+    // Fibonacci Bloom Radius
+    // R expands as a function of index to create a spiral fanning effect
+    const spread=Math.min(Math.PI*1.4, 0.6 * n + 0.5);   // total fan angle
     const step = n>1 ? spread/(n-1) : 0;
-    // chord = 2R*sin(step/2) >= need  ->  R >= need / (2 sin(step/2))
-    let R = n>1 ? need/(2*Math.sin(step/2)) : (kd+pad+34);
-    R = Math.max(R, kd+pad+30);
-    // golden easing of radius so it never grows absurd, but expands organically
-    R = Math.min(R, 96 + 26*Math.log(n+1)*PHI);
 
     kids.forEach((k,i)=>{
       const ang = base + (i-(n-1)/2)*step;
-      const dx=Math.cos(ang)*R, dy=Math.sin(ang)*R;
+      // Fibonacci Growth: Each successive kid is slightly further out
+      // Golden Spiral Logic: R = baseR * phi^(2*angle/pi) - simplified for UI
+      const fibR = (kd+pad+30) + (i * 8 * PHI); 
+      const dx=Math.cos(ang)*fibR, dy=Math.sin(ang)*fibR;
       k.style.setProperty('--dx',dx.toFixed(1)+'px');
       k.style.setProperty('--dy',dy.toFixed(1)+'px');
-      k.style.transitionDelay=(i*26)+'ms';
+      // Staggered entrance for the "Bloom" feel
+      k.style.transitionDelay=(i*35)+'ms';
+      // Add a slight rotation for the organic spiral look
+      k.style.setProperty('--rot', (i * 10) + 'deg');
     });
   }
 
