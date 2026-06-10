@@ -31,22 +31,23 @@ import com.inkframe.core.common.Vec2
 import com.inkframe.core.model.*
 import com.inkframe.engine.gl.CanvasRenderer
 import androidx.compose.ui.graphics.Brush as ComposeBrush
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @Composable
 fun StudioScreen(state: StudioState = viewModel()) {
     var canvasView by remember { mutableStateOf<CanvasView?>(null) }
     val context = LocalContext.current
-    val resolver = context.contentResolver
 
     // Launchers (SAF)
     val saveLauncher = rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.CreateDocument(MediaTypes.DocumentKind.PROJECT.mimeType),
-    ) { uri -> /* existing save logic */ }
+        ActivityResultContracts.CreateDocument(MediaTypes.DocumentKind.PROJECT.mimeType),
+    ) { uri -> /* logic in StudioState */ }
     
     val onSave = { saveLauncher.launch(MediaTypes.suggestedFileName(state.project.name, MediaTypes.DocumentKind.PROJECT)) }
-    val onOpen = { /* existing open logic */ }
+    val onOpen = { /* logic in StudioState */ }
 
-    // Logic for Dialogs
+    // Dialogs
     if (state.showBrushLibrary) {
         BrushLibraryDialog(onSelect = { state.brush = it; state.showBrushLibrary = false }, onDismiss = { state.showBrushLibrary = false })
     }
@@ -63,14 +64,19 @@ fun StudioScreen(state: StudioState = viewModel()) {
             .fillMaxSize()
             .background(ComposeBrush.verticalGradient(listOf(Color(0xFF0F0F12), Color(0xFF1A1A20), Color(0xFF0A0A0C))))
     ) {
-        // Rail
-        Column(Modifier.width(64.dp).fillMaxHeight().background(ComposeBrush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.3f), Color.Transparent)))) {
+        // Left Rail: Brushes + Modifiers
+        Column(
+            Modifier
+                .width(64.dp)
+                .fillMaxHeight()
+                .background(ComposeBrush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.3f), Color.Transparent)))
+        ) {
             BrushRail(state, onSelect = { state.brush = it })
             Spacer(Modifier.weight(1f))
             ModifierRail(state)
         }
 
-        // Canvas Area
+        // Central Canvas Area
         Column(Modifier.weight(1f)) {
             Box(Modifier.weight(1f)) {
                 if (state.showVfxHud) { VfxHud(state) }
@@ -118,17 +124,38 @@ fun StudioScreen(state: StudioState = viewModel()) {
                         view.setShowChecker(state.showChecker)
                     }
                 )
-                TopToolbar(state, onUndo = { canvasView?.undo() }, onRedo = { canvasView?.redo() }, onSave = onSave, onOpen = onOpen, 
-                           onExport = { }, onFit = { canvasView?.fitToScreen() }, onReset100 = { canvasView?.resetZoom() },
-                           onToggleOnion = { state.onionSkin = state.onionSkin.copy(enabled = !state.onionSkin.enabled); canvasView?.requestRender() },
-                           onOpenOnionSettings = { state.showOnionSettings = true },
-                           onToggleEyedropper = { state.eyedropperActive = !state.eyedropperActive },
-                           onToggleFill = { state.fillActive = !state.fillActive },
-                           onToggleChecker = { state.showChecker = !state.showChecker; canvasView?.setShowChecker(state.showChecker) })
+                TopToolbar(
+                    state = state, 
+                    onUndo = { canvasView?.undo() }, 
+                    onRedo = { canvasView?.redo() }, 
+                    onSave = onSave, 
+                    onOpen = onOpen, 
+                    onExport = { /* Export logic */ }, 
+                    onFit = { canvasView?.fitToScreen() }, 
+                    onReset100 = { canvasView?.resetZoom() },
+                    onToggleOnion = { state.onionSkin = state.onionSkin.copy(enabled = !state.onionSkin.enabled); canvasView?.requestRender() },
+                    onOpenOnionSettings = { state.showOnionSettings = true },
+                    onToggleEyedropper = { state.eyedropperActive = !state.eyedropperActive },
+                    onToggleFill = { state.fillActive = !state.fillActive },
+                    onToggleChecker = { state.showChecker = !state.showChecker; canvasView?.setShowChecker(state.showChecker) }
+                )
             }
             FibonacciTimeline(state, onChanged = { canvasView?.requestRender() })
         }
         SidePanel(state, onChanged = { canvasView?.requestRender() })
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> canvasView?.onPause()
+                Lifecycle.Event.ON_RESUME -> canvasView?.onResume()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }
 
