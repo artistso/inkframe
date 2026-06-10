@@ -66,7 +66,7 @@ fun SidePanel(state: StudioState, onChanged: () -> Unit) {
         val active = state.activeLayer
         LabeledSlider(
             label = "Layer opacity", value = active.opacity, range = 0f..1f,
-            valueText = percent(active.opacity),
+            valueText = inkFramePercent(active.opacity),
         ) { v -> state.setLayerOpacity(active.id, v); onChanged() }
         
         // Color Palette
@@ -140,4 +140,4 @@ fun LayerRow(
     }
 }
 
-fun percent(v: Float): String = "${(v * 100f).toInt()}%"
+fun inkFramePercent(v: Float): String = "${(v * 100f).toInt()}%"
