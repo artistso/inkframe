@@ -5,9 +5,11 @@ import com.inkframe.core.common.DirtyRegion
 import com.inkframe.core.common.FloodFill
 import com.inkframe.core.common.IntRect
 import com.inkframe.core.common.UndoStack
+import com.inkframe.core.common.Vec2
 import com.inkframe.core.model.Brush
 import com.inkframe.core.model.BrushKind
 import com.inkframe.core.model.ColorSampler
+import com.inkframe.core.model.DefaultBrushes
 import com.inkframe.core.model.ProjectPackage
 import com.inkframe.core.model.RgbaColor
 import java.nio.ByteBuffer
