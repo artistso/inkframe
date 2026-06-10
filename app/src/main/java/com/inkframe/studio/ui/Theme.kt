@@ -7,13 +7,16 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Accent = Color(0xFF4F9CF9)
+private val InkCyan = Color(0xFF00E5FF)
+private val InkDeep = Color(0xFF0A0A0C)
+private val InkGlass = Color(0xFF1A1A20)
 
 private val DarkColors = darkColorScheme(
-    primary = Accent,
-    secondary = Color(0xFF8E6CEF),
-    background = Color(0xFF1E1E22),
-    surface = Color(0xFF26262B),
+    primary = InkCyan,
+    secondary = Color(0xFF7C4DFF),
+    background = InkDeep,
+    surface = InkGlass,
+    surfaceVariant = Color(0xFF25252B)
 )
 
 private val LightColors = lightColorScheme(

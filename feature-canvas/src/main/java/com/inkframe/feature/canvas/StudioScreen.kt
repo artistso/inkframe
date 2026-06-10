@@ -295,7 +295,19 @@ fun StudioScreen(state: StudioState = viewModel()) {
         }
     }
 
-    Row(Modifier.fillMaxSize().background(Color(0xFF131316))) {
+    Row(
+        Modifier
+            .fillMaxSize()
+            .background(
+                ComposeBrush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF0F0F12), // Deep Space Top
+                        Color(0xFF1A1A20), // Horizon Line
+                        Color(0xFF0A0A0C)  // Deep Ink Bottom
+                    )
+                )
+            )
+    ) {
         // Left side: Combined Brush and Modifier Rail
         Column(
             Modifier
@@ -445,6 +457,65 @@ fun StudioScreen(state: StudioState = viewModel()) {
  * Part of the organic UI system to maximize canvas visibility.
  */
 @Composable
+private fun InkFrameTitle(
+    name: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.padding(start = 12.dp, end = 24.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Stylized "IF" Logo Ring
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(32.dp)
+                .border(1.5.dp, ComposeBrush.sweepGradient(listOf(Color.Cyan, Color.Transparent, Color.Cyan)), CircleShape)
+        ) {
+            Text(
+                "I", 
+                color = Color.White, 
+                fontWeight = FontWeight.Black, 
+                fontSize = 14.sp,
+                modifier = Modifier.offset(x = (-2).dp)
+            )
+            Text(
+                "F", 
+                color = Color.Cyan, 
+                fontWeight = FontWeight.Black, 
+                fontSize = 14.sp,
+                modifier = Modifier.offset(x = 2.dp)
+            )
+        }
+        
+        Spacer(Modifier.width(12.dp))
+        
+        // The Project Name with "Ink Frame" stylized look
+        Column {
+            Text(
+                text = "INKFRAME",
+                color = Color.White,
+                style = TextStyle(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 12.sp,
+                    letterSpacing = 4.sp,
+                    shadow = Shadow(color = Color.Cyan.copy(alpha = 0.5f), blurRadius = 8f)
+                )
+            )
+            Text(
+                text = name.uppercase(),
+                color = Color.White.copy(alpha = 0.4f),
+                style = TextStyle(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.sp
+                )
+            )
+        }
+    }
+}
+
+@Composable
 private fun DonutIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
@@ -523,8 +594,11 @@ private fun TopToolbar(
             active = state.canRedo,
             onClick = onRedo
         )
-        val title = state.statusMessage ?: state.project.name
-        Text(title, color = Color.White, modifier = Modifier.weight(1f).padding(start = 8.dp))
+
+        InkFrameTitle(
+            name = state.statusMessage ?: state.project.name,
+            modifier = Modifier.weight(1f)
+        )
 
         // Zoom controls: tap the % to reset to 100%, the frame icon to fit.
         Text(
@@ -637,21 +711,24 @@ private fun ModifierKeyButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(44.dp)
+            .size(46.dp)
             .clip(CircleShape)
-            .background(if (active) MaterialTheme.colorScheme.primary else Color(0xFF2C2C32))
+            .background(
+                if (active) ComposeBrush.radialGradient(listOf(Color.Cyan.copy(alpha = 0.3f), Color.Transparent))
+                else Color.Transparent
+            )
             .border(
-                width = 1.dp,
-                color = if (active) Color.White else Color.White.copy(alpha = 0.2f),
+                width = if (active) 2.dp else 1.dp,
+                color = if (active) Color.Cyan else Color.White.copy(alpha = 0.1f),
                 shape = CircleShape
             )
             .clickableNoRipple(onClick)
     ) {
         Text(
-            text = label.take(1), // Minimalist one-letter label
-            color = Color.White,
+            text = label.take(1),
+            color = if (active) Color.Cyan else Color.White.copy(alpha = 0.5f),
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Normal
         )
     }
 }
@@ -672,28 +749,50 @@ private fun BrushRail(
     ) {
         DefaultBrushes.all.forEach { b ->
             val selected = b.id == current.id
-            Surface(
-                color = if (selected) MaterialTheme.colorScheme.primary else Color(0xFF2C2C32),
-                shape = CircleShape,
-                modifier = Modifier.size(44.dp),
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) ComposeBrush.radialGradient(listOf(Color.Cyan.copy(alpha = 0.2f), Color.Transparent))
+                        else Color.Transparent
+                    )
+                    .border(
+                        width = if (selected) 2.dp else 1.dp,
+                        color = if (selected) Color.Cyan else Color.White.copy(alpha = 0.15f),
+                        shape = CircleShape
+                    )
+                    .clickableNoRipple { if (selected) onOpenSettings() else onSelect(b) }
             ) {
-                // Tapping the selected brush again opens its settings; tapping another selects it.
-                IconButton(onClick = { if (selected) onOpenSettings() else onSelect(b) }) {
-                    Text(b.name.take(1), color = Color.White)
-                }
+                Text(
+                    text = b.name.take(1).uppercase(),
+                    color = if (selected) Color.Cyan else Color.White.copy(alpha = 0.7f),
+                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Normal,
+                    fontSize = 16.sp
+                )
             }
         }
         // Button to expand/add more brushes
-        Surface(color = Color(0xFF2C2C32), shape = CircleShape, modifier = Modifier.size(44.dp)) {
-            IconButton(onClick = onOpenLibrary) {
-                Icon(Icons.Filled.Add, contentDescription = "More brushes", tint = Color.White)
-            }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(46.dp)
+                .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                .clickableNoRipple(onOpenLibrary)
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = "More brushes", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
         }
+        
         // Explicit settings (tune) button so the gesture is discoverable.
-        Surface(color = Color(0xFF2C2C32), shape = CircleShape, modifier = Modifier.size(44.dp)) {
-            IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Filled.Tune, contentDescription = "Brush settings", tint = Color.White)
-            }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(46.dp)
+                .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                .clickableNoRipple(onOpenSettings)
+        ) {
+            Icon(Icons.Filled.Tune, contentDescription = "Brush settings", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -1096,14 +1195,14 @@ private fun FibonacciSquare(
             .background(
                 ComposeBrush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF2C2C32).copy(alpha = 0.85f),
-                        Color(0xFF1E1E22).copy(alpha = 0.95f)
+                        Color(0xFF1A1A20).copy(alpha = 0.85f),
+                        Color(0xFF0A0A0C).copy(alpha = 0.95f)
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.15f),
+                color = Color.Cyan.copy(alpha = 0.1f),
                 shape = MaterialTheme.shapes.medium
             ),
         contentAlignment = Alignment.Center
@@ -1315,15 +1414,19 @@ private fun BlendModePicker(
 private fun SidePanel(state: StudioState, onChanged: () -> Unit) {
     Column(
         Modifier
-            .width(260.dp)
+            .width(280.dp)
             .fillMaxHeight()
             .background(
                 ComposeBrush.horizontalGradient(
-                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.4f))
+                    colors = listOf(
+                        Color.Transparent, 
+                        Color(0xFF1A1A20).copy(alpha = 0.4f),
+                        Color.Black.copy(alpha = 0.6f)
+                    )
                 )
             )
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Layers", color = Color.White, modifier = Modifier.weight(1f))
