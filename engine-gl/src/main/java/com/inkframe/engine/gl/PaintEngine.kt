@@ -228,7 +228,7 @@ class PaintEngine(
         }
 
         for (d in finalDabs) dirty.addCircle(d.center.x, d.center.y, d.size)
-        brushRenderer.stampToScratch(scratch(), brush, strokeColor, finalDabs, buildUp = brush.buildUp)
+        brushRenderer.stampToScratch(scratch(), brush, strokeColor, finalDabs, buildUp = brush.buildUp, glow = brush.glowTrail)
     }
 
     // ---- Undo / redo --------------------------------------------------------

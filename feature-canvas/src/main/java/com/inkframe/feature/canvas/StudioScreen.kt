@@ -1078,7 +1078,7 @@ private fun FibonacciTimeline(
                     Text("${state.project.canvas.fps}", color = Color.White, style = MaterialTheme.typography.labelSmall)
                 }
 
-                // 3. Loop/Range (80dp)
+                // 3. Loop/Range & Symmetry (80dp)
                 FibonacciSquare(80, 0, 44) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Row {
@@ -1089,8 +1089,21 @@ private fun FibonacciTimeline(
                                 Icon(Icons.Filled.LastPage, null, tint = Color.White)
                             }
                         }
-                        IconButton(onClick = { state.toggleLoop(); onChanged() }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Filled.Repeat, null, tint = if (state.scene.loop) Color.Cyan else Color.White)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { state.toggleLoop(); onChanged() }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Filled.Repeat, null, tint = if (state.scene.loop) Color.Cyan else Color.White)
+                            }
+                            if (state.symmetryEnabled) {
+                                Text(
+                                    "${state.symmetryCount}",
+                                    color = Color.Cyan,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.clickableNoRipple {
+                                        state.symmetryCount = if (state.symmetryCount >= 12) 2 else state.symmetryCount + 2
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -1132,6 +1145,20 @@ private fun FibonacciTimeline(
                                     .padding(vertical = 2.dp)
                                     .clip(MaterialTheme.shapes.small)
                                     .background(if (active) Color.White.copy(alpha = 0.1f) else Color.Transparent)
+                                    .pointerInput(layer.id) {
+                                        detectDragGestures(
+                                            onDragStart = { 
+                                                state.activeLayerId = layer.id
+                                            },
+                                            onDragEnd = {
+                                                if (state.altPressed) {
+                                                    state.duplicateLayer(layer.id)
+                                                    state.statusMessage = "Specter Duplicate created"
+                                                }
+                                            },
+                                            onDrag = { _, _ -> /* Visual reordering logic to come */ }
+                                        )
+                                    }
                                     .clickableNoRipple { state.activeLayerId = layer.id; onChanged() }
                                     .padding(4.dp),
                                 verticalAlignment = Alignment.CenterVertically

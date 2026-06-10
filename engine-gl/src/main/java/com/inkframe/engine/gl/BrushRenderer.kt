@@ -28,6 +28,7 @@ class BrushRenderer(context: Context) {
     private val uCanvasSize = GLES30.glGetUniformLocation(program, "uCanvasSize")
     private val uColor = GLES30.glGetUniformLocation(program, "uColor")
     private val uHardness = GLES30.glGetUniformLocation(program, "uHardness")
+    private val uGlowEnabled = GLES30.glGetUniformLocation(program, "uGlowEnabled")
 
     private val overlayProgram = linkProgram(
         context.readAsset("shaders/composite.vert"),
@@ -62,7 +63,7 @@ class BrushRenderer(context: Context) {
      * (airbrush) vs. GL_MAX (uniform coverage, no darkening). The brush [color] RGB is
      * written; per-dab flow comes from each [Dab].
      */
-    fun stampToScratch(scratch: GlSurface, brush: Brush, color: com.inkframe.core.model.RgbaColor, dabs: List<Dab>, buildUp: Boolean) {
+    fun stampToScratch(scratch: GlSurface, brush: Brush, color: com.inkframe.core.model.RgbaColor, dabs: List<Dab>, buildUp: Boolean, glow: Boolean = false) {
         if (dabs.isEmpty()) return
         scratch.bind()
 
@@ -84,6 +85,7 @@ class BrushRenderer(context: Context) {
         GLES30.glUseProgram(program)
         GLES30.glUniform2f(uCanvasSize, scratch.width.toFloat(), scratch.height.toFloat())
         GLES30.glUniform1f(uHardness, brush.hardness)
+        GLES30.glUniform1i(uGlowEnabled, if (glow) 1 else 0)
         GLES30.glUniform4f(uColor, color.r, color.g, color.b, 1f)
 
         ensureCapacity(dabs.size)
