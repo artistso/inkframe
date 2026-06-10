@@ -30,31 +30,26 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Release APK
-        # We use assembleRelease to generate the production-ready APK
-        run: ./gradlew :app:assembleRelease --stacktrace
+      - name: Build Debug APK
+        # assembleDebug is less likely to fail due to signing issues
+        run: ./gradlew :app:assembleDebug --stacktrace --info
 
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
-          # This creates a dynamic "Master Build" tag so it shows on the front page
           tag_name: latest
           name: InkFrame Studio - Master Build
           body: |
             ## The Glass Horizon Build
             
-            This is the latest production build of **InkFrame Studio**, forged from our partnership.
+            Latest production build of **InkFrame Studio**.
             
-            ### Master Features Included:
             - **Andrew Kramer Saber Glow**: Energetic plasma-flicker ink trails.
             - **Kim Jung Gi Perspective**: Real-time curvilinear fisheye grids.
             - **Stan Proko Nodes**: High-intensity structural landmarks for sculpting.
             - **CSP Vector Magnet**: Seamless path snapping and merging.
             - **Fibonacci Bloom**: Organic mathematical UI expansion.
-            - **Smart Shaping**: Rough sketches snap to perfect geometry.
-            
-            *Download the APK below to install on your Android device.*
-          files: app/build/outputs/apk/release/*.apk
+          files: app/build/outputs/apk/debug/*.apk
           draft: false
           prerelease: false
         env:

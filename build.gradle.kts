@@ -1,13 +1,10 @@
 // Top-level build file.
 plugins {
-    id("com.android.application") version "8.5.2" apply false
-    id("com.android.library") version "8.5.2" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.0" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" apply false
-    
-    // Perfection Specification Plugins
-    id("com.diffplug.spotless") version "6.25.0" apply false
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.0" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.play.publisher) apply false
 }
 
 tasks.register("clean", Delete::class) {

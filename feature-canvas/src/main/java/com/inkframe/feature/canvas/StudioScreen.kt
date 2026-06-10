@@ -90,6 +90,8 @@ import com.inkframe.core.model.OnionSkinSettings
 import com.inkframe.core.model.TimelineDrag
 import com.inkframe.core.model.Hsv
 import com.inkframe.core.model.RgbaColor
+import com.inkframe.core.common.Vec2
+import com.inkframe.engine.gl.CanvasRenderer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
