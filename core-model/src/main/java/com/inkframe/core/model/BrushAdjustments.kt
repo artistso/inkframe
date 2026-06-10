@@ -21,6 +21,8 @@ object BrushAdjustments {
     val SPACING_RANGE = 0.01f..1f
     val SMOOTHING_RANGE = 0f..0.95f
     val STABILIZATION_RANGE = 0f..1f
+    val POST_CORRECTION_RANGE = 0f..1f
+    val VECTOR_MAGNET_RANGE = 0f..1f
 
     private fun Float.clampTo(r: ClosedFloatingPointRange<Float>): Float =
         coerceIn(r.start, r.endInclusive)
@@ -55,6 +57,12 @@ object BrushAdjustments {
 
     fun withStabilization(brush: Brush, stabilization: Float): Brush =
         brush.copy(stabilization = stabilization.clampTo(STABILIZATION_RANGE))
+
+    fun withPostCorrection(brush: Brush, correction: Float): Brush =
+        brush.copy(postCorrection = correction.clampTo(POST_CORRECTION_RANGE))
+
+    fun withVectorMagnet(brush: Brush, magnet: Float): Brush =
+        brush.copy(vectorMagnet = magnet.clampTo(VECTOR_MAGNET_RANGE))
 
     fun withGlowTrail(brush: Brush, enabled: Boolean): Brush =
         brush.copy(glowTrail = enabled)

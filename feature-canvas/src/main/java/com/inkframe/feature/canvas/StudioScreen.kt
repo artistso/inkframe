@@ -876,6 +876,16 @@ private fun BrushSettingsPanel(
                     valueText = percent(brush.stabilization),
                 ) { v -> onChange { BrushAdjustments.withStabilization(it, v) } }
 
+                LabeledSlider(
+                    label = "Post-Correction (CSP)", value = brush.postCorrection, range = BrushAdjustments.POST_CORRECTION_RANGE,
+                    valueText = percent(brush.postCorrection),
+                ) { v -> onChange { BrushAdjustments.withPostCorrection(it, v) } }
+
+                LabeledSlider(
+                    label = "Vector Magnet", value = brush.vectorMagnet, range = BrushAdjustments.VECTOR_MAGNET_RANGE,
+                    valueText = percent(brush.vectorMagnet),
+                ) { v -> onChange { BrushAdjustments.withVectorMagnet(it, v) } }
+
                 ToggleRow("Pressure → size", brush.pressureToSize) { e ->
                     onChange { BrushAdjustments.withPressureToSize(it, e) }
                 }

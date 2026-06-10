@@ -21,6 +21,10 @@ data class Brush(
     val smoothing: Float = 0.35f,
     /** 0.0 (raw) to 1.0 (heavy stabilization). */
     val stabilization: Float = 0f,
+    /** Post-draw simplification level (0.0 to 1.0). CSP style. */
+    val postCorrection: Float = 0f,
+    /** Snap start/end to existing lines (0.0 to 1.0 threshold). */
+    val vectorMagnet: Float = 0f,
     /** Whether this brush leaves a glowing vector trail animation. */
     val glowTrail: Boolean = false,
     /** Whether to snap rough sketches to perfect geometric shapes. */

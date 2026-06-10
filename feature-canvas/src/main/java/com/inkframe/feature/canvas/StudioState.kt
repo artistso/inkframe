@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.inkframe.core.common.ShapeDetector
 import com.inkframe.core.common.Vec2
+import com.inkframe.core.common.VectorMath
 
 /**
  * Observable studio state. Holds the document [Project] plus the current editing
@@ -421,32 +422,53 @@ class StudioState : ViewModel() {
     fun recordStroke(data: com.inkframe.core.model.StrokeData) {
         val layer = activeLayer
         val cel = layer.cels[currentFrame] ?: return
+        val existingPaths = cel.vectorData.strokes.map { it.points.map { p -> p.pos } }
 
-        // 1. Check for Smart Shaping
-        val processedData = if (brush.smartShaping) {
-            val shape = ShapeDetector.detect(data.points.map { it.pos })
+        var processedPoints = data.points
+
+        // 1. Vector Magnet (CSP style snapping)
+        if (brush.vectorMagnet > 0f && existingPaths.isNotEmpty()) {
+            val threshold = brush.vectorMagnet * 50f // 0..50px snap range
+            val startSnap = VectorMath.findSnapPoint(processedPoints.first().pos, existingPaths, threshold)
+            val endSnap = VectorMath.findSnapPoint(processedPoints.last().pos, existingPaths, threshold)
+            
+            val newPoints = processedPoints.toMutableList()
+            if (startSnap != null) newPoints[0] = newPoints[0].copy(pos = startSnap)
+            if (endSnap != null) newPoints[newPoints.lastIndex] = newPoints.lastIndex.let { newPoints[it].copy(pos = endSnap) }
+            processedPoints = newPoints
+        }
+
+        // 2. Post-Correction (CSP style simplification)
+        if (brush.postCorrection > 0f) {
+            val epsilon = brush.postCorrection * 5f // 0..5px deviation
+            val simplifiedPos = VectorMath.simplify(processedPoints.map { it.pos }, epsilon)
+            // Reconstruct points (interpolation for pressure/time would be better, but this is a start)
+            processedPoints = simplifiedPos.map { pos ->
+                // Find original point closest to this simplified pos to keep its pressure
+                processedPoints.minByOrNull { it.pos.distanceTo(pos) }?.copy(pos = pos) 
+                    ?: com.inkframe.core.model.StrokePoint(pos, 0.5f, 0L)
+            }
+        }
+
+        // 3. Smart Shaping
+        val finalData = if (brush.smartShaping) {
+            val shape = ShapeDetector.detect(processedPoints.map { it.pos })
             if (shape.type != ShapeDetector.ShapeType.NONE) {
                 statusMessage = "Smart Shaped: ${shape.type.name}"
                 data.copy(points = shape.points.map { 
                     com.inkframe.core.model.StrokePoint(it, 0.5f, 0L) 
                 })
-            } else data
-        } else data
+            } else data.copy(points = processedPoints)
+        } else data.copy(points = processedPoints)
 
-        // 2. Add to vector data
-        val newVector = cel.vectorData.copy(strokes = cel.vectorData.strokes + processedData)
+        // 4. Add to vector data
+        val newVector = cel.vectorData.copy(strokes = cel.vectorData.strokes + finalData)
         updateLayer(layer.id) { l ->
             l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))
         }
         
-        // 3. Re-render if shaped (since bitmap needs updating)
-        if (processedData !== data) {
-            postEngineWork?.invoke { engine ->
-                // Clear the dirty region and re-stamp the perfect shape
-                // For now, we rely on the next composite pass or a manual redraw request
-                onUiInvalidate?.invoke()
-            }
-        }
+        // 5. Re-render
+        onUiInvalidate?.invoke()
     }
 
     private fun updateScene(transform: (Scene) -> Scene) {
