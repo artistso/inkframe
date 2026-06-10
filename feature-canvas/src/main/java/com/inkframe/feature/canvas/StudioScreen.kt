@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FormatColorFill
+import androidx.compose.material.icons.filled.Troubleshoot
 import androidx.compose.material.icons.filled.Grid3x3
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.GridOn
@@ -367,6 +368,9 @@ fun StudioScreen(state: StudioState = viewModel()) {
                     canvasView?.setShowChecker(state.showChecker)
                 },
             )
+                if (state.showVfxHud) {
+                    VfxHud(state)
+                }
             Box(Modifier.weight(1f)) {
                 AndroidView(
                     factory = { ctx ->
@@ -599,6 +603,50 @@ private fun DonutIconButton(
 }
 
 @Composable
+private fun VfxHud(state: StudioState) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.TopEnd
+    ) {
+        Column(
+            horizontalAlignment = Alignment.End,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.2f), MaterialTheme.shapes.small)
+                .padding(8.dp)
+        ) {
+            Text(
+                "TELEMETRY_V1.0",
+                color = Color.Cyan,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "ZOOM: ${state.zoomPercent}%",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 9.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+            )
+            Text(
+                "NODES: ${state.activeLayer.cels[state.currentFrame]?.vectorData?.strokes?.sumOf { it.points.size } ?: 0}",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 9.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+            )
+            if (state.ctrlPressed) {
+                Text("MODE: LASSO_ENGAGED", color = Color.Yellow, fontSize = 9.sp)
+            }
+            if (state.shiftPressed) {
+                Text("MODE: SEGMENT_SCULPT", color = Color.Magenta, fontSize = 9.sp)
+            }
+        }
+    }
+}
+
+@Composable
 private fun TopToolbar(
     state: StudioState,
     onUndo: () -> Unit,
@@ -729,6 +777,14 @@ private fun TopToolbar(
             contentDescription = "Perspective Grid",
             active = state.perspectiveEnabled,
             onClick = { state.perspectiveEnabled = !state.perspectiveEnabled }
+        )
+        Spacer(Modifier.width(4.dp))
+        
+        DonutIconButton(
+            icon = Icons.Filled.Troubleshoot,
+            contentDescription = "VFX Telemetry",
+            active = state.showVfxHud,
+            onClick = { state.showVfxHud = !state.showVfxHud }
         )
     }
 }

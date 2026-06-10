@@ -75,6 +75,8 @@ class StudioState : ViewModel() {
     var timelineExpanded by mutableStateOf(false)
     /** Whether the current brush's integrated settings are expanded. */
     var brushSettingsExpanded by mutableStateOf(false)
+    /** Whether the VFX Telemetry HUD is active. */
+    var showVfxHud by mutableStateOf(false)
     /** Id of the layer currently being renamed (shows the rename dialog), or null. */
     var renamingLayerId by mutableStateOf<String?>(null)
 

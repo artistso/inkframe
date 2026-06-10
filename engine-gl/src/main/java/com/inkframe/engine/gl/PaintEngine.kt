@@ -228,7 +228,11 @@ class PaintEngine(
         }
 
         for (d in finalDabs) dirty.addCircle(d.center.x, d.center.y, d.size)
-        brushRenderer.stampToScratch(scratch(), brush, strokeColor, finalDabs, buildUp = brush.buildUp, glow = brush.glowTrail)
+        brushRenderer.stampToScratch(
+            scratch(), brush, strokeColor, finalDabs, 
+            buildUp = brush.buildUp, glow = brush.glowTrail,
+            time = (System.currentTimeMillis() % 100000).toFloat() / 1000f
+        )
     }
 
     // ---- Undo / redo --------------------------------------------------------
@@ -364,6 +368,7 @@ class PaintEngine(
         // Rendering Quantum Nodes if in sculpt mode
         if (sculptData.isNotEmpty()) {
             flat.bind()
+            val time = (System.currentTimeMillis() % 100000).toFloat() / 1000f
             for (si in sculptData.indices) {
                 val stroke = sculptData[si]
                 for (pi in stroke.points.indices) {
@@ -374,7 +379,7 @@ class PaintEngine(
                     brushRenderer.stampToScratch(
                         flat, DefaultBrushes.ink, 
                         if (isSelected) com.inkframe.core.model.RgbaColor.CYAN else com.inkframe.core.model.RgbaColor.WHITE, 
-                        dabs, buildUp = false, glow = false, nodeMode = true
+                        dabs, buildUp = false, glow = false, nodeMode = true, time = time
                     )
                 }
             }
