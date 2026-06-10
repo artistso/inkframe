@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FormatColorFill
+import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Movie
@@ -633,6 +634,15 @@ private fun TopToolbar(
         )
         Spacer(Modifier.width(4.dp))
 
+        // Sculpt Mode (Quantum Path Editing)
+        DonutIconButton(
+            icon = Icons.Filled.Gesture,
+            contentDescription = "Sculpt Path",
+            active = state.sculptMode,
+            onClick = { state.sculptMode = !state.sculptMode; state.statusMessage = if (state.sculptMode) "Sculpt Mode: Drag points" else null }
+        )
+        Spacer(Modifier.width(4.dp))
+
         // Tap toggles onion skin; the adjacent gear opens its multi-frame settings.
         DonutIconButton(
             icon = Icons.Filled.Layers,
@@ -861,6 +871,9 @@ private fun BrushSettingsPanel(
                 ToggleRow("Glow Trail (Vector)", brush.glowTrail) { e ->
                     onChange { BrushAdjustments.withGlowTrail(it, e) }
                 }
+                ToggleRow("Smart Shaping", brush.smartShaping) { e ->
+                    onChange { BrushAdjustments.withSmartShaping(it, e) }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
@@ -1036,12 +1049,17 @@ private fun FibonacciTimeline(
     val expanded = state.timelineExpanded
     val alpha by animateFloatAsState(if (expanded) 1f else 0f, label = "alpha")
     val scale by animateFloatAsState(if (expanded) 1f else 0.4f, label = "scale")
+    
+    // Ambient Drift (Organic Fibonacci motion)
+    val driftX by animateFloatAsState(if (expanded) 0f else 4f, label = "driftX")
+    val driftY by animateFloatAsState(if (expanded) 0f else 4f, label = "driftY")
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(if (expanded) 400.dp else 60.dp)
-            .padding(8.dp),
+            .padding(8.dp)
+            .offset(x = driftX.dp, y = driftY.dp),
         contentAlignment = Alignment.BottomStart
     ) {
         // The Trigger Button (Bottom Left)

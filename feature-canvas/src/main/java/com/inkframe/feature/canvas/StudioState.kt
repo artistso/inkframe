@@ -23,6 +23,9 @@ import com.inkframe.core.model.TimelineOps
 import com.inkframe.engine.gl.PaintEngine
 import java.util.concurrent.atomic.AtomicLong
 
+import com.inkframe.core.common.ShapeDetector
+import com.inkframe.core.common.Vec2
+
 /**
  * Observable studio state. Holds the document [Project] plus the current editing
  * context (active scene/layer/frame, brush, color, playback state). The Compose UI
@@ -46,6 +49,8 @@ class StudioState : ViewModel() {
     var showColorPicker by mutableStateOf(false)
     /** Whether the eyedropper tool is armed (next canvas tap samples a colour). */
     var eyedropperActive by mutableStateOf(false)
+    /** Whether the "Sculpt" (Quantum Path) mode is active. */
+    var sculptMode by mutableStateOf(false)
     /** Whether the bucket/fill tool is armed (next canvas tap flood-fills). */
     var fillActive by mutableStateOf(false)
     /** Whether the brush settings panel is open. */
@@ -411,9 +416,31 @@ class StudioState : ViewModel() {
     fun recordStroke(data: com.inkframe.core.model.StrokeData) {
         val layer = activeLayer
         val cel = layer.cels[currentFrame] ?: return
-        val newVector = cel.vectorData.copy(strokes = cel.vectorData.strokes + data)
+
+        // 1. Check for Smart Shaping
+        val processedData = if (brush.smartShaping) {
+            val shape = ShapeDetector.detect(data.points.map { it.pos })
+            if (shape.type != ShapeDetector.ShapeType.NONE) {
+                statusMessage = "Smart Shaped: ${shape.type.name}"
+                data.copy(points = shape.points.map { 
+                    com.inkframe.core.model.StrokePoint(it, 0.5f, 0L) 
+                })
+            } else data
+        } else data
+
+        // 2. Add to vector data
+        val newVector = cel.vectorData.copy(strokes = cel.vectorData.strokes + processedData)
         updateLayer(layer.id) { l ->
             l.copy(cels = l.cels + (currentFrame to cel.copy(vectorData = newVector)))
+        }
+        
+        // 3. Re-render if shaped (since bitmap needs updating)
+        if (processedData !== data) {
+            postEngineWork?.invoke { engine ->
+                // Clear the dirty region and re-stamp the perfect shape
+                // For now, we rely on the next composite pass or a manual redraw request
+                onUiInvalidate?.invoke()
+            }
         }
     }
 

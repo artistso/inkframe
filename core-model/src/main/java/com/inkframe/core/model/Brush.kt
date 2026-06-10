@@ -23,6 +23,8 @@ data class Brush(
     val stabilization: Float = 0f,
     /** Whether this brush leaves a glowing vector trail animation. */
     val glowTrail: Boolean = false,
+    /** Whether to snap rough sketches to perfect geometric shapes. */
+    val smartShaping: Boolean = false,
     /** How points in a stroke are connected (Continuous dabs vs Point-to-Point lines). */
     val connection: BrushConnection = BrushConnection.DABS,
     /**

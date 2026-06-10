@@ -59,6 +59,9 @@ object BrushAdjustments {
     fun withGlowTrail(brush: Brush, enabled: Boolean): Brush =
         brush.copy(glowTrail = enabled)
 
+    fun withSmartShaping(brush: Brush, enabled: Boolean): Brush =
+        brush.copy(smartShaping = enabled)
+
     fun withPressureToSize(brush: Brush, enabled: Boolean): Brush =
         brush.copy(pressureToSize = enabled)
 
