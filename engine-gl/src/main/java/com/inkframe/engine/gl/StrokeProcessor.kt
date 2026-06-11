@@ -118,6 +118,8 @@ class StrokeProcessor(private val brush: Brush) {
         var finalSizeMult = sizeMultiplier
         
         // Velocity-Responsive Taper: If drawing fast, sharpen the start
+        // TODO: implement drawVel calculation
+        val drawVel = 0f
         if (drawVel > 15f && sizeMultiplier < 1f) {
             finalSizeMult *= 0.7f // Sharper flick
         }

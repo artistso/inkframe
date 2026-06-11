@@ -73,7 +73,9 @@ class PaintEngine(
                 val before = cel.readPixels(glRect.x, glRect.y, glRect.w, glRect.h)
                 brushRenderer.compositeScratchToCel(cel, scratch(), strokeOpacity, brush.kind == BrushKind.ERASER)
                 val after = cel.readPixels(glRect.x, glRect.y, glRect.w, glRect.h)
-                undoStack.pushAlreadyApplied(StrokeCommand(StrokeSnapshot(celId, glRect, before, after), ::restorePixels))
+                undoStack.pushAlreadyApplied(StrokeCommand(StrokeSnapshot(celId, glRect, before, after)) { id, rect, pixels ->
+                    getOrCreateSurface(id).writePixels(rect.x, rect.y, rect.w, rect.h, pixels)
+                })
                 onHistoryChanged?.invoke()
             }
         }
@@ -101,10 +103,6 @@ class PaintEngine(
         }
         for (d in finalDabs) dirty.addCircle(d.center.x, d.center.y, d.size)
         brushRenderer.stampToScratch(scratch(), brush, strokeColor, finalDabs, brush.buildUp, brush.glowTrail, false, (System.currentTimeMillis() % 100000).toFloat() / 1000f)
-    }
-
-    private fun restorePixels(snapshot: StrokeSnapshot) {
-        getOrCreateSurface(snapshot.surfaceId).writePixels(snapshot.rect.x, snapshot.rect.y, snapshot.rect.w, snapshot.rect.h, snapshot.after)
     }
 
     private fun topToGlRect(r: IntRect) = IntRect(r.x, canvasHeight - r.y - r.h, r.w, r.h)
