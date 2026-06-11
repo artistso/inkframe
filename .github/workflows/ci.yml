@@ -10,6 +10,13 @@ on:
 permissions:
   contents: write  # required for creating/updating GitHub Releases
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,25 +34,23 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       # ── 3. Gradle wrapper must be executable ──────────────────────────────
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
       # ── 4. Build debug APK ────────────────────────────────────────────────
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
-        env:
-          GRADLE_OPTS: >-
-            -Dorg.gradle.daemon=false
-            -Dorg.gradle.jvmargs=-Xmx2g
-            -XX:MaxMetaspaceSize=512m
+        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
       # ── 5. Always upload APK as a workflow artifact (30-day retention) ────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: inkframe-debug-${{ github.sha }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
       # ── 6. On main-branch push → create/overwrite the "latest" release ───
@@ -61,6 +66,12 @@ jobs:
             Download `app-debug.apk` below and sideload onto your device.
 
             > ⚠️ This is a debug build — not signed for production.
-          files: app/build/outputs/apk/debug/app-debug.apk
+            
+            ### Features included:
+            - Andrew Kramer Saber Glow (Flicker active)
+            - Kim Jung Gi Perspective Engine
+            - Proko Structural Nodes
+            - Fibonacci Organic UI
+          files: app/build/outputs/apk/debug/*.apk
           make_latest: true
           prerelease: true

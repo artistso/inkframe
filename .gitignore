@@ -7,3 +7,8 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 *.jar
 uploads/
+local.properties
+.idea/
+*.iml
+.DS_Store
+.gitconfig
