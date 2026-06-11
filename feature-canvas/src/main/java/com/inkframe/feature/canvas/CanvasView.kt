@@ -43,6 +43,8 @@ class CanvasView(
     var symmetryEnabled: Boolean = false
     var symmetryCount: Int = 0
 
+    var onViewportChanged: ((Float) -> Unit)? = null
+
     private val renderer = CanvasRenderer(context, canvasWidth, canvasHeight, sceneProvider, sculptProvider, perspectiveProvider, lassoProvider, selectionProvider, cursorProvider, onEngineReady, SurfaceBackupStore())
 
     init {
@@ -146,6 +148,7 @@ class CanvasView(
         val curBx = event.getX(ib); val curBy = event.getY(ib)
         renderer.viewport = renderer.viewport.applyGesture(Vec2(prevAx, prevAy), Vec2(prevBx, prevBy), Vec2(curAx, curAy), Vec2(curBx, curBy))
         prevAx = curAx; prevAy = curAy; prevBx = curBx; prevBy = curBy
+        onViewportChanged?.invoke(renderer.viewport.scale)
     }
     
     fun undo() { renderer.post(CanvasRenderer.EngineEvent.Undo); requestRender() }

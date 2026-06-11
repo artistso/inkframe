@@ -113,6 +113,12 @@ class PaintEngine(
     val canUndo get() = undoStack.canUndo
     val canRedo get() = undoStack.canRedo
 
+    fun cloneSurface(srcId: Long, dstId: Long) {
+        val src = surfaces[srcId] ?: return
+        val dst = getOrCreateSurface(dstId)
+        brushRenderer.blit(dst, src)
+    }
+
     fun composeAndPresent(specs: List<LayerDrawSpec>, screenW: Int, screenH: Int, showChecker: Boolean, invCoeffs: FloatArray, sculptData: List<StrokeData> = emptyList(), perspective: Boolean = false, fisheye: Float = 0f, lassoPoints: List<Vec2> = emptyList(), selectedNodes: List<Pair<Int, Int>> = emptyList(), cursorPos: Vec2? = null) {
         var previewSurface: GlSurface? = null
         val cel = strokeCel
