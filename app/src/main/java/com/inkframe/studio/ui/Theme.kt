@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 private val InkCyan = Color(0xFF00E5FF)
 private val InkDeep = Color(0xFF0A0A0C)
 private val InkGlass = Color(0xFF1A1A20)
+private val Accent = InkCyan
 
 private val DarkColors = darkColorScheme(
     primary = InkCyan,

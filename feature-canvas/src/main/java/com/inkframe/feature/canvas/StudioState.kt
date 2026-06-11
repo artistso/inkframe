@@ -22,6 +22,7 @@ import com.inkframe.core.model.RgbaColor
 import com.inkframe.core.model.Scene
 import com.inkframe.core.model.TimelineOps
 import com.inkframe.engine.gl.PaintEngine
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 import com.inkframe.core.common.ShapeDetector

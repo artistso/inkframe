@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -141,3 +144,204 @@ fun LayerRow(
 }
 
 fun inkFramePercent(v: Float): String = "${(v * 100f).toInt()}%"
+
+// ─── Brush Rail ─────────────────────────────────────────────────────────────
+
+@Composable
+fun BrushRail(state: StudioState, onSelect: (Brush) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+    ) {
+        // Library shortcut
+        IconButton(
+            onClick = { state.showBrushLibrary = true },
+            modifier = Modifier.size(44.dp)
+        ) {
+            Icon(Icons.Filled.Add, "Brush Library", tint = Color(0xFF666677), modifier = Modifier.size(20.dp))
+        }
+
+        DefaultBrushes.all.forEach { brush ->
+            val isSelected = brush.id == state.brush.id
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.18f)
+                        else Color.Black.copy(alpha = 0.3f)
+                    )
+                    .border(
+                        width = if (isSelected) 1.5.dp else 0.dp,
+                        color = if (isSelected) Color(0xFF00E5FF) else Color.Transparent,
+                        shape = CircleShape
+                    )
+                    .clickableNoRipple { onSelect(brush) }
+            ) {
+                Text(
+                    text = brush.name.take(2).uppercase(),
+                    color = if (isSelected) Color(0xFF00E5FF) else Color(0xFFAAAAAA),
+                    fontSize = 9.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                )
+            }
+        }
+    }
+}
+
+// ─── Modifier Rail ──────────────────────────────────────────────────────────
+
+@Composable
+fun ModifierRail(state: StudioState) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+    ) {
+        RailIconButton(Icons.Filled.Edit, "Sculpt Mode", state.sculptMode) {
+            state.sculptMode = !state.sculptMode
+        }
+        RailIconButton(Icons.Filled.Flip, "Symmetry", state.symmetryEnabled) {
+            state.symmetryEnabled = !state.symmetryEnabled
+        }
+        RailIconButton(Icons.Filled.GridOn, "Perspective", state.perspectiveEnabled) {
+            state.perspectiveEnabled = !state.perspectiveEnabled
+        }
+    }
+}
+
+@Composable
+private fun RailIconButton(
+    icon: ImageVector,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (active) Color(0xFF00E5FF) else Color(0xFF555566),
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+// ─── Top Toolbar ─────────────────────────────────────────────────────────────
+
+@Composable
+fun TopToolbar(
+    state: StudioState,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onSave: () -> Unit,
+    onOpen: () -> Unit,
+    onExport: () -> Unit,
+    onFit: () -> Unit,
+    onReset100: () -> Unit,
+    onToggleOnion: () -> Unit,
+    onOpenOnionSettings: () -> Unit,
+    onToggleEyedropper: () -> Unit,
+    onToggleFill: () -> Unit,
+    onToggleChecker: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .background(Color.Black.copy(alpha = 0.45f))
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // History
+        IconButton(onClick = onUndo, enabled = state.canUndo) {
+            Icon(
+                Icons.AutoMirrored.Filled.Undo, "Undo",
+                tint = if (state.canUndo) Color.White else Color(0xFF333344),
+            )
+        }
+        IconButton(onClick = onRedo, enabled = state.canRedo) {
+            Icon(
+                Icons.AutoMirrored.Filled.Redo, "Redo",
+                tint = if (state.canRedo) Color.White else Color(0xFF333344),
+            )
+        }
+
+        VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp), color = Color.White.copy(alpha = 0.12f))
+
+        // File ops
+        IconButton(onClick = onSave) { Icon(Icons.Filled.Save, "Save", tint = Color(0xFF888899)) }
+        IconButton(onClick = onOpen) { Icon(Icons.Filled.FolderOpen, "Open", tint = Color(0xFF888899)) }
+        IconButton(onClick = onExport) { Icon(Icons.Filled.FileDownload, "Export", tint = Color(0xFF888899)) }
+
+        VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp), color = Color.White.copy(alpha = 0.12f))
+
+        // Viewport
+        IconButton(onClick = onFit) { Icon(Icons.Filled.ZoomOutMap, "Fit", tint = Color(0xFF888899)) }
+        Text("${state.zoomPercent}%", color = Color(0xFF666677), fontSize = 10.sp)
+
+        VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp), color = Color.White.copy(alpha = 0.12f))
+
+        // Tool toggles
+        ToolToggle(Icons.Filled.Colorize, "Eyedropper", state.eyedropperActive, onToggleEyedropper)
+        ToolToggle(Icons.Filled.FormatColorFill, "Fill", state.fillActive, onToggleFill)
+        ToolToggle(Icons.Filled.Layers, "Onion Skin", state.onionSkin.enabled, onToggleOnion)
+        IconButton(onClick = onOpenOnionSettings, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Filled.Tune, "Onion Settings", tint = Color(0xFF555566), modifier = Modifier.size(14.dp))
+        }
+        ToolToggle(Icons.Filled.GridOn, "Checker", state.showChecker, onToggleChecker)
+
+        Spacer(Modifier.weight(1f))
+
+        state.statusMessage?.let { msg ->
+            Text(msg, color = Color(0xFFFFD740), fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp))
+        }
+        if (state.isBusy) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp).padding(end = 8.dp),
+                color = Color(0xFF00E5FF),
+                strokeWidth = 2.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolToggle(icon: ImageVector, label: String, active: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (active) Color(0xFF00E5FF) else Color(0xFF555566),
+        )
+    }
+}
+
+// ─── VFX HUD ─────────────────────────────────────────────────────────────────
+
+@Composable
+fun VfxHud(state: StudioState) {
+    Column(
+        modifier = Modifier
+            .padding(8.dp)
+            .background(Color.Black.copy(alpha = 0.65f), MaterialTheme.shapes.small)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        HudLine("Frame", "${state.currentFrame + 1} / ${state.scene.frameCount}")
+        HudLine("Zoom", "${state.zoomPercent}%")
+        HudLine("Layer", state.activeLayer.name)
+        HudLine("Brush", state.brush.name)
+        state.statusMessage?.let { HudLine("Status", it, Color(0xFFFFD740)) }
+    }
+}
+
+@Composable
+private fun HudLine(label: String, value: String, valueColor: Color = Color(0xFF00E5FF)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, color = Color(0xFF666677), fontSize = 10.sp, modifier = Modifier.width(44.dp))
+        Text(value, color = valueColor, fontSize = 10.sp)
+    }
+}
