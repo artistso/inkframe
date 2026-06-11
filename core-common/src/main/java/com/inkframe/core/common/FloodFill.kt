@@ -1,7 +1,6 @@
 package com.inkframe.core.common
 
 import android.graphics.Bitmap
-import com.inkframe.core.model.RgbaColor
 
 /**
  * Scanline fill algorithm for flood-filling regions.
