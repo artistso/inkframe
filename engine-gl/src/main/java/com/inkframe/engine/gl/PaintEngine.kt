@@ -73,9 +73,10 @@ class PaintEngine(
                 val before = cel.readPixels(glRect.x, glRect.y, glRect.w, glRect.h)
                 brushRenderer.compositeScratchToCel(cel, scratch(), strokeOpacity, brush.kind == BrushKind.ERASER)
                 val after = cel.readPixels(glRect.x, glRect.y, glRect.w, glRect.h)
-                undoStack.pushAlreadyApplied(StrokeCommand(StrokeSnapshot(celId, glRect, before, after)) { id, rect, pixels ->
+                val snapshot = StrokeSnapshot(celId, glRect, before, after)
+                undoStack.pushAlreadyApplied(StrokeCommand(snapshot, restore = { id, rect, pixels ->
                     getOrCreateSurface(id).writePixels(rect.x, rect.y, rect.w, rect.h, pixels)
-                })
+                }))
                 onHistoryChanged?.invoke()
             }
         }
